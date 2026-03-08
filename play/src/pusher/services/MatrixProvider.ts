@@ -24,9 +24,7 @@ class MatrixProvider {
     }
 
     private async initialize() {
-        if (!NO_SYNAPSE) {
-            await this.overrideRateLimitForAdminAccount();
-        }
+        await this.overrideRateLimitForAdminAccount();
         const roomID = await this.createChatFolderAreaAndSetID();
         this.roomAreaFolderID = roomID;
     }
@@ -123,6 +121,10 @@ class MatrixProvider {
     }
 
     private async overrideRateLimitForAdminAccount() {
+        if (NO_SYNAPSE) {
+            console.warn("overrideRateLimitForAdminAccount skipped because NO_SYNAPSE is true");
+            return;
+        }
         const client = await this.getClient();
         await client.http.authedRequest(
             Method.Post,
