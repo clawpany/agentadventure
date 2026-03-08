@@ -156,6 +156,7 @@ export const MATRIX_API_URI: string | undefined = env.MATRIX_API_URI;
 export const MATRIX_ADMIN_USER: string | undefined = env.MATRIX_ADMIN_USER;
 export const MATRIX_ADMIN_PASSWORD: string | undefined = env.MATRIX_ADMIN_PASSWORD;
 export const MATRIX_DOMAIN: string | undefined = env.MATRIX_DOMAIN;
+export const NO_SYNAPSE: boolean = env.NO_SYNAPSE || false;
 
 export const ENABLE_SAY: boolean = env.ENABLE_SAY || true;
 
@@ -239,5 +240,6 @@ export const FRONT_ENVIRONMENT_VARIABLES: FrontConfigurationInterface = {
     PROVIDE_DEFAULT_WOKA_NAME,
     PROVIDE_DEFAULT_WOKA_TEXTURE,
     ENABLE_TUTORIAL,
+    NO_SYNAPSE,
 };
 export const GRPC_MAX_MESSAGE_SIZE = env.GRPC_MAX_MESSAGE_SIZE;

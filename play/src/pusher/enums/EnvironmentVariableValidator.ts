@@ -476,6 +476,11 @@ export const EnvironmentVariables = z.object({
         .describe(
             "Virtual background transformer engine: 'tasks-vision' (GPU-accelerated, experimental) or 'selfie-segmentation' (CPU-based, stable). Currently defaults to 'selfie-segmentation'; 'tasks-vision' is intended as the future default once considered stable."
         ),
+    NO_SYNAPSE: BoolAsString.optional()
+        .transform((val) => toBool(val, false))
+        .describe(
+            "If true, the Matrix server is not a Synapse server and Synapse-specific admin API calls will be skipped."
+        ),
 });
 
 export type EnvironmentVariables = z.infer<typeof EnvironmentVariables>;

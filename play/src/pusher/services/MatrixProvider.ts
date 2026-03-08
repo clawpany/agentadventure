@@ -1,7 +1,13 @@
 import pLimit from "p-limit";
 import type { ICreateRoomOpts, MatrixClient } from "matrix-js-sdk";
 import { createClient, EventType, Visibility, Method } from "matrix-js-sdk";
-import { MATRIX_ADMIN_PASSWORD, MATRIX_ADMIN_USER, MATRIX_API_URI, MATRIX_DOMAIN } from "../enums/EnvironmentVariable";
+import {
+    MATRIX_ADMIN_PASSWORD,
+    MATRIX_ADMIN_USER,
+    MATRIX_API_URI,
+    MATRIX_DOMAIN,
+    NO_SYNAPSE,
+} from "../enums/EnvironmentVariable";
 
 const ADMIN_CHAT_ID = `@${MATRIX_ADMIN_USER}:${MATRIX_DOMAIN}`;
 
@@ -18,7 +24,9 @@ class MatrixProvider {
     }
 
     private async initialize() {
-        await this.overrideRateLimitForAdminAccount();
+        if (!NO_SYNAPSE) {
+            await this.overrideRateLimitForAdminAccount();
+        }
         const roomID = await this.createChatFolderAreaAndSetID();
         this.roomAreaFolderID = roomID;
     }
@@ -49,6 +57,10 @@ class MatrixProvider {
     }
 
     async setNewMatrixPassword(matrixUserId: string, password: string): Promise<void> {
+        if (NO_SYNAPSE) {
+            console.warn("setNewMatrixPassword skipped because NO_SYNAPSE is true");
+            return;
+        }
         const client = await this.getClient();
         await client.http.authedRequest(Method.Put, `/_synapse/admin/v2/users/${matrixUserId}`, undefined, {
             logout_devices: false,
