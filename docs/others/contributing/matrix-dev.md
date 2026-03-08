@@ -58,8 +58,8 @@ classDiagram
 
 The Matrix integration is used through the [matrix-js-sdk](https://github.com/matrix-org/matrix-js-sdk).
 
-WorkAdventure relies on the new "Rust crypto" implementation of the matrix-js-sdk, so encoding does not
-need the legacy Olm library.
+WorkAdventure relies on the `matrix-js-sdk` and its "Rust crypto" implementation, so encoding does not
+need the legacy Olm library. All API calls (standard and Synapse-specific) are performed using the SDK.
 
 ## Login flow
 
@@ -80,8 +80,8 @@ sequenceDiagram
     Login provider->>+Pusher: Returns auth token
     Pusher->>+Pusher: Generates JWT token containing OIDC auth token and stores it in a cookie
 
-    Pusher->>+Front: HTTP 302 to /_matrix/client/r0/login/sso/redirect
-    Front->>+Matrix: Redirect to /_matrix/client/r0/login/sso/redirect
+    Pusher->>+Front: HTTP 302 to /_matrix/client/v3/login/sso/redirect
+    Front->>+Matrix: Redirect to /_matrix/client/v3/login/sso/redirect
     Matrix->>+Front: HTTP 302 to Login provider
     Front->>+Login provider: Redirect to login provider with parameter "login_challenge"
     Login provider->>+Login provider: Login process. User is already authenticated. No UI is shown.
@@ -91,7 +91,7 @@ sequenceDiagram
 
     Pusher->>+Front: HTTP 302 to /?token=xxx&matrixLoginToken=xxx - Redirects to play, with JWT token AND Matrix login token in parameter
     Front->>+Front: Stores JWT token
-    Front->>+Matrix: Call /_matrix/client/r0/login with the Matrix login token
+    Front->>+Matrix: Call /_matrix/client/v3/login with the Matrix login token
     Matrix->>+Front: Returns Matrix access token and refresh token
     Front->>+Front: Stores Matrix access token and refresh token
     Front->>+Matrix: Establish a connection with the Matrix access token
