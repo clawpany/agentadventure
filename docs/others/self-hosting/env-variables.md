@@ -125,6 +125,7 @@ Environment variables for the Play service (frontend and pusher).
 | `LIVEKIT_RECORDING_S3_REGION` | No | The S3 region for Livekit recording. |
 | `LIVEKIT_RECORDING_S3_CDN_ENDPOINT` | No | The S3 CDN endpoint for Livekit recording. |
 | `BACKGROUND_TRANSFORMER_ENGINE` | No | Virtual background transformer engine: 'tasks-vision' (GPU-accelerated, experimental) or 'selfie-segmentation' (CPU-based, stable). Currently defaults to 'selfie-segmentation'; 'tasks-vision' is intended as the future default once considered stable. |
+| `NO_SYNAPSE` | No | If true, the Matrix server is not a Synapse server and Synapse-specific admin API calls will be skipped. |
 
 ## Back Service
 
