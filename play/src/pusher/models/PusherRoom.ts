@@ -1,7 +1,7 @@
 import type { BatchToPusherRoomMessage, PusherToBackRoomMessage } from "@workadventure/messages";
 import Debug from "debug";
 import type { ClientDuplexStream } from "@grpc/grpc-js";
-import * as Sentry from "@sentry/node";
+import Sentry from "../utils/sentry";
 import type { WAMFileFormat } from "@workadventure/map-editor";
 
 import { GRPC_MAX_MESSAGE_SIZE } from "../enums/EnvironmentVariable";

@@ -1,4 +1,4 @@
-import * as Sentry from "@sentry/node";
+import Sentry from "../utils/sentry";
 import Debug from "debug";
 import type { BackToPusherSpaceMessage } from "@workadventure/messages";
 import type { SpaceManagerClient } from "@workadventure/messages/src/ts-proto-generated/services";

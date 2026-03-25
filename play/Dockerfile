@@ -11,7 +11,10 @@ RUN npm run tag-version && npm run ts-proto
 # typescript build
 FROM --platform=$BUILDPLATFORM node:20.18-bullseye-slim AS builder
 ARG NODE_OPTIONS="--max-old-space-size=16384"
-ARG FAST_BUILD=""
+ARG FAST_BUILD=true
+ARG ENABLE_BACKGROUND_BLUR=false
+ARG ENABLE_SENTRY=false
+ARG ENABLE_POSTHOG=false
 WORKDIR /usr/src
 RUN apt-get update && apt-get install -y git
 COPY package.json package-lock.json ./
@@ -43,6 +46,9 @@ RUN --mount=type=secret,id=SENTRY_RELEASE \
     export SENTRY_ENVIRONMENT=$(cat /run/secrets/SENTRY_ENVIRONMENT) && \
     export NODE_OPTIONS="$NODE_OPTIONS" && \
     export DISABLE_LEGACY_BROWSERS="$FAST_BUILD" && \
+    export ENABLE_BACKGROUND_BLUR="$ENABLE_BACKGROUND_BLUR" && \
+    export ENABLE_SENTRY="$ENABLE_SENTRY" && \
+    export ENABLE_POSTHOG="$ENABLE_POSTHOG" && \
     cd play && \
     npm run typesafe-i18n && \
     npm run build-iframe-api && \
@@ -62,9 +68,23 @@ COPY libs/math-utils/package.json libs/math-utils/package.json
 COPY libs/tailwind/package.json libs/tailwind/package.json
 COPY libs/store-utils/package.json libs/store-utils/package.json
 COPY libs/shared-utils/package.json libs/shared-utils/package.json
+COPY play/scripts/conditional-install.sh play/scripts/conditional-install.sh
+ARG ENABLE_BACKGROUND_BLUR=false
+ARG ENABLE_S3_RECORDING=false
+ARG ENABLE_SWAGGER=false
+ARG ENABLE_SENTRY=false
+ARG ENABLE_POSTHOG=false
 ENV NODE_ENV=production
 ENV UWS_HTTP_MAX_HEADERS_SIZE=16384
-RUN npm ci --omit=dev --workspace workadventure-play
+ENV ENABLE_SENTRY=${ENABLE_SENTRY}
+ENV ENABLE_S3_RECORDING=${ENABLE_S3_RECORDING}
+RUN ENABLE_BACKGROUND_BLUR=$ENABLE_BACKGROUND_BLUR \
+    ENABLE_S3_RECORDING=$ENABLE_S3_RECORDING \
+    ENABLE_SWAGGER=$ENABLE_SWAGGER \
+    ENABLE_SENTRY=$ENABLE_SENTRY \
+    ENABLE_POSTHOG=$ENABLE_POSTHOG \
+    sh play/scripts/conditional-install.sh && \
+    npm ci --omit=dev --workspace workadventure-play
 COPY --from=builder /usr/src/libs /usr/src/libs
 COPY --from=builder --chown=node:node /usr/src/play /usr/src/play
 WORKDIR /usr/src/play

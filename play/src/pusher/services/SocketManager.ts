@@ -45,7 +45,7 @@ import type {
     BackEventFrontToPusherMessage,
 } from "@workadventure/messages";
 import { noUndefined, ServerToClientMessage } from "@workadventure/messages";
-import * as Sentry from "@sentry/node";
+import Sentry from "../utils/sentry";
 import type { AxiosResponse } from "axios";
 import axios, { isAxiosError } from "axios";
 import type { WebSocket } from "uWebSockets.js";

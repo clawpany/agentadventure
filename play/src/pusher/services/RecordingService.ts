@@ -1,13 +1,3 @@
-import {
-    ListObjectsCommand,
-    type ListObjectsCommandOutput,
-    S3Client,
-    type S3ClientConfig,
-    DeleteObjectCommand,
-    GetObjectCommand,
-    type _Object,
-} from "@aws-sdk/client-s3";
-import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import type { Recording, Thumbnail } from "@workadventure/messages";
 import {
     LIVEKIT_RECORDING_S3_ENDPOINT,
@@ -18,14 +8,57 @@ import {
     LIVEKIT_RECORDING_S3_REGION,
 } from "../enums/EnvironmentVariable";
 
+// Lazy-loaded AWS SDK modules — only imported when ENABLE_S3_RECORDING is true
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let s3Module: any;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let presignerModule: any;
+
+async function getS3Module() {
+    if (process.env.ENABLE_S3_RECORDING !== "true") {
+        throw new Error("S3 recording is disabled. Set ENABLE_S3_RECORDING=true and install @aws-sdk/client-s3.");
+    }
+    if (!s3Module) {
+        s3Module = await import("@aws-sdk/client-s3");
+    }
+    return s3Module;
+}
+
+async function getPresignerModule() {
+    if (process.env.ENABLE_S3_RECORDING !== "true") {
+        throw new Error(
+            "S3 recording is disabled. Set ENABLE_S3_RECORDING=true and install @aws-sdk/s3-request-presigner."
+        );
+    }
+    if (!presignerModule) {
+        presignerModule = await import("@aws-sdk/s3-request-presigner");
+    }
+    return presignerModule;
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function createS3Client(endpoint: string, accessKey: string, secretKey: string, region: string): Promise<any> {
+    const { S3Client } = await getS3Module();
+    return new S3Client({
+        endpoint: endpoint,
+        region: region,
+        credentials: {
+            accessKeyId: accessKey,
+            secretAccessKey: secretKey,
+        },
+        forcePathStyle: true,
+    });
+}
+
 export default class RecordingService {
     // Thumbnail signed URLs expire after 1 hour (for viewing in the recordings list)
     private static readonly THUMBNAIL_URL_EXPIRATION_SECONDS = 3600;
 
     public static async getRecords(userUuid: string): Promise<Recording[]> {
-        let client: S3Client;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        let client: any;
         try {
-            client = this.getS3Client();
+            client = await this.getS3Client();
         } catch (error) {
             console.error("Error getting S3 client:", error);
             return [];
@@ -66,7 +99,7 @@ export default class RecordingService {
 
         const sessions = new Map<string, SessionData>();
 
-        contents.forEach((item) => {
+        contents.forEach((item: { Key?: string; Size?: number }) => {
             if (!item.Key) return;
 
             const filename = item.Key.replace(`${userUuid}/`, "");
@@ -150,20 +183,23 @@ export default class RecordingService {
      * Generate a signed URL for a thumbnail image (for viewing purposes)
      */
     private static async generateThumbnailSignedUrl(key: string): Promise<string> {
-        const client = this.getS3ClientCDN();
+        const client = await this.getS3ClientCDN();
+        const { GetObjectCommand } = await getS3Module();
 
         const command = new GetObjectCommand({
             Bucket: LIVEKIT_RECORDING_S3_BUCKET,
             Key: key,
         });
 
+        const { getSignedUrl } = await getPresignerModule();
         return getSignedUrl(client, command, { expiresIn: this.THUMBNAIL_URL_EXPIRATION_SECONDS });
     }
 
     public static async deleteRecord(userUuid: string, recordingId: string): Promise<boolean> {
-        let client: S3Client;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        let client: any;
         try {
-            client = this.getS3Client();
+            client = await this.getS3Client();
         } catch (error) {
             console.error("Error getting S3 client:", error);
             return false;
@@ -175,6 +211,7 @@ export default class RecordingService {
         }
 
         try {
+            const { DeleteObjectCommand } = await getS3Module();
             const contents = await this.listAllObjects(client, LIVEKIT_RECORDING_S3_BUCKET, `${userUuid}/`);
 
             if (contents.length === 0) {
@@ -184,7 +221,7 @@ export default class RecordingService {
 
             const timestampBase = recordingId.replace("recording-", "").replace(".mp4", "");
             const filesToDelete = contents
-                .filter((item) => {
+                .filter((item: { Key?: string }) => {
                     if (!item.Key) return false;
 
                     const recordingPath = `${userUuid}/${recordingId}`; // Full path of the recording
@@ -192,14 +229,14 @@ export default class RecordingService {
 
                     return item.Key === recordingPath || item.Key.startsWith(thumbnailPrefix);
                 })
-                .map((item) => item.Key!);
+                .map((item: { Key: string }) => item.Key);
 
             if (filesToDelete.length === 0) {
                 console.warn("No files found to delete for timestamp:", timestampBase);
                 return false;
             }
 
-            const deletePromises = filesToDelete.map(async (key) => {
+            const deletePromises = filesToDelete.map(async (key: string) => {
                 const deleteCommand = new DeleteObjectCommand({
                     Bucket: LIVEKIT_RECORDING_S3_BUCKET,
                     Key: key,
@@ -223,8 +260,11 @@ export default class RecordingService {
      * @param prefix Prefix to filter objects
      * @returns Array of all objects
      */
-    private static async listAllObjects(client: S3Client, bucket: string, prefix: string): Promise<_Object[]> {
-        const allContents: _Object[] = [];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    private static async listAllObjects(client: any, bucket: string, prefix: string): Promise<any[]> {
+        const { ListObjectsCommand } = await getS3Module();
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const allContents: any[] = [];
         let isTruncated = true;
         let marker: string | undefined = undefined;
 
@@ -236,7 +276,7 @@ export default class RecordingService {
             });
 
             // eslint-disable-next-line no-await-in-loop
-            const response: ListObjectsCommandOutput = await client.send(command);
+            const response = await client.send(command);
 
             if (response.Contents) {
                 allContents.push(...response.Contents);
@@ -255,7 +295,8 @@ export default class RecordingService {
         return allContents;
     }
 
-    private static getS3Client(): S3Client {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    private static async getS3Client(): Promise<any> {
         if (
             !LIVEKIT_RECORDING_S3_ENDPOINT ||
             !LIVEKIT_RECORDING_S3_BUCKET ||
@@ -267,7 +308,7 @@ export default class RecordingService {
             throw new Error("Recording S3 configuration is not set. Skipping fetching recordings.");
         }
 
-        return RecordingService.createS3Client(
+        return createS3Client(
             LIVEKIT_RECORDING_S3_ENDPOINT,
             LIVEKIT_RECORDING_S3_ACCESS_KEY,
             LIVEKIT_RECORDING_S3_SECRET_KEY,
@@ -275,7 +316,8 @@ export default class RecordingService {
         );
     }
 
-    private static getS3ClientCDN(): S3Client {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    private static async getS3ClientCDN(): Promise<any> {
         if (
             (!LIVEKIT_RECORDING_S3_CDN_ENDPOINT && !LIVEKIT_RECORDING_S3_ENDPOINT) ||
             !LIVEKIT_RECORDING_S3_BUCKET ||
@@ -287,7 +329,7 @@ export default class RecordingService {
             throw new Error("Recording S3 configuration is not set. Skipping fetching recordings.");
         }
 
-        return RecordingService.createS3Client(
+        return createS3Client(
             LIVEKIT_RECORDING_S3_CDN_ENDPOINT || LIVEKIT_RECORDING_S3_ENDPOINT!,
             LIVEKIT_RECORDING_S3_ACCESS_KEY,
             LIVEKIT_RECORDING_S3_SECRET_KEY,
@@ -295,21 +337,10 @@ export default class RecordingService {
         );
     }
 
-    private static createS3Client(endpoint: string, accessKey: string, secretKey: string, region: string): S3Client {
-        const config: S3ClientConfig = {
-            endpoint: endpoint,
-            region: region,
-            credentials: {
-                accessKeyId: accessKey,
-                secretAccessKey: secretKey,
-            },
-            forcePathStyle: true,
-        };
-        return new S3Client(config);
-    }
-
     public static async getSignedUrl(key: string): Promise<string> {
-        const client = this.getS3ClientCDN();
+        const client = await this.getS3ClientCDN();
+        const { GetObjectCommand } = await getS3Module();
+        const { getSignedUrl } = await getPresignerModule();
 
         // Extract filename from key for content disposition
         const filename = key.split("/").pop() || key;

@@ -23,7 +23,7 @@ import {
 } from "@workadventure/messages";
 import { z } from "zod";
 import { extendApi } from "@anatine/zod-openapi";
-import * as Sentry from "@sentry/node";
+import Sentry from "../utils/sentry";
 import { Deferred } from "@workadventure/shared-utils";
 import { errors } from "jose";
 import {

@@ -1,7 +1,7 @@
 /* eslint-disable listeners/no-inline-function-event-listener, listeners/no-missing-remove-event-listener */
 import type { RedisClientOptions } from "redis";
 import { createClient } from "redis";
-import * as Sentry from "@sentry/node";
+import Sentry from "../utils/sentry";
 
 import { REDIS_HOST, REDIS_PASSWORD, REDIS_PORT } from "../enums/EnvironmentVariable";
 

@@ -1,4 +1,4 @@
-import { basename } from "path";
+import path from "path";
 import fs from "fs";
 import { defineConfig, loadEnv } from "vite";
 import { svelte } from "@sveltejs/vite-plugin-svelte";
@@ -30,7 +30,7 @@ export default defineConfig(({ mode }) => {
             sourcemap: env.GENERATE_SOURCEMAP !== "false",
             outDir: "./dist/public",
             rollupOptions: {
-                plugins: [mediapipe_workaround()],
+                plugins: [],
                 // external: ["@mediapipe/tasks-vision"],
                 //plugins: [inject({ Buffer: ["buffer/", "Buffer"] })],
             },
@@ -74,9 +74,20 @@ export default defineConfig(({ mode }) => {
                   ]),
             tsconfigPaths(),
         ],
+        define: {
+            __ENABLE_BACKGROUND_BLUR__: JSON.stringify(env.ENABLE_BACKGROUND_BLUR === "true"),
+            __ENABLE_SENTRY__: JSON.stringify(env.ENABLE_SENTRY === "true"),
+            __ENABLE_POSTHOG__: JSON.stringify(env.ENABLE_POSTHOG === "true"),
+        },
         resolve: {
             alias: {
                 events: "events",
+                ...(env.ENABLE_SENTRY === "true"
+                    ? {}
+                    : {
+                          "@sentry/svelte": path.resolve(__dirname, "src/front/utils/sentry-noop.ts"),
+                          "@sentry/browser": path.resolve(__dirname, "src/front/utils/sentry-noop.ts"),
+                      }),
             },
         },
         test: {
@@ -100,7 +111,7 @@ export default defineConfig(({ mode }) => {
         },
     };
 
-    if (env.SENTRY_ORG && env.SENTRY_PROJECT && env.SENTRY_AUTH_TOKEN && env.SENTRY_RELEASE && env.SENTRY_ENVIRONMENT) {
+    if (env.ENABLE_SENTRY === "true" && env.SENTRY_ORG && env.SENTRY_PROJECT && env.SENTRY_AUTH_TOKEN && env.SENTRY_RELEASE && env.SENTRY_ENVIRONMENT) {
         console.info("Sentry plugin enabled");
         config.plugins.push(
             sentryVitePlugin({
@@ -129,20 +140,3 @@ export default defineConfig(({ mode }) => {
     }
     return config;
 });
-
-// use to fix the build issue with mediapipe ==> https://github.com/tensorflow/tfjs/issues/7165
-// TODO: remove this when we migrate to mediapipe/tasks-vision
-function mediapipe_workaround() {
-    return {
-        name: "mediapipe_workaround",
-        load(id: string) {
-            if (basename(id) === "selfie_segmentation.js") {
-                let code = fs.readFileSync(id, "utf-8");
-                code += "exports.SelfieSegmentation = SelfieSegmentation;";
-                return { code };
-            } else {
-                return null;
-            }
-        },
-    };
-}

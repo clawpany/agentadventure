@@ -1,6 +1,6 @@
 import type { Request, Response, Application } from "express";
 import { z } from "zod";
-import * as Sentry from "@sentry/node";
+import Sentry from "../utils/sentry";
 import Debug from "debug";
 import { validateQuery } from "../services/QueryValidator";
 import type { JWTTokenManager } from "../services/JWTTokenManager";
