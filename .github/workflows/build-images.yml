@@ -30,6 +30,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build and push play image
+        id: build-play
         uses: docker/build-push-action@v6
         with:
           context: ./
@@ -41,6 +42,16 @@ jobs:
             ghcr.io/clawpany/agentadventure-play:latest
             ghcr.io/clawpany/agentadventure-play:agent
             ghcr.io/clawpany/agentadventure-play:${{ github.sha }}
+
+      - name: Report play image size
+        run: |
+          IMAGE="ghcr.io/clawpany/agentadventure-play:${{ github.sha }}"
+          SIZE_BYTES=$(skopeo inspect docker://$IMAGE | jq '.Size')
+          SIZE_MB=$(echo "$SIZE_BYTES" | awk '{printf "%.2f", $1/1024/1024}')
+          echo "### 📦 play 镜像构建信息" >> $GITHUB_STEP_SUMMARY
+          echo "- **镜像名称**: \`$IMAGE\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Digest**: \`${{ steps.build-play.outputs.digest }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **远端压缩大小**: **${SIZE_MB} MB**" >> $GITHUB_STEP_SUMMARY
 
   build-aio:
     runs-on: ubuntu-24.04
@@ -62,6 +73,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build and push aio image
+        id: build-aio
         uses: docker/build-push-action@v6
         with:
           context: ./
@@ -73,3 +85,13 @@ jobs:
             ghcr.io/clawpany/agentadventure-aio:latest
             ghcr.io/clawpany/agentadventure-aio:agent
             ghcr.io/clawpany/agentadventure-aio:${{ github.sha }}
+
+      - name: Report aio image size
+        run: |
+          IMAGE="ghcr.io/clawpany/agentadventure-aio:${{ github.sha }}"
+          SIZE_BYTES=$(skopeo inspect docker://$IMAGE | jq '.Size')
+          SIZE_MB=$(echo "$SIZE_BYTES" | awk '{printf "%.2f", $1/1024/1024}')
+          echo "### 📦 aio 镜像构建信息" >> $GITHUB_STEP_SUMMARY
+          echo "- **镜像名称**: \`$IMAGE\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Digest**: \`${{ steps.build-aio.outputs.digest }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **远端压缩大小**: **${SIZE_MB} MB**" >> $GITHUB_STEP_SUMMARY
