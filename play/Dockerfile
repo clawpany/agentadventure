@@ -1,7 +1,7 @@
 
 # typescript build (includes protobuf generation)
 FROM --platform=$BUILDPLATFORM node:20.18-bullseye-slim AS builder
-ARG NODE_OPTIONS="--max-old-space-size=4096"
+ARG NODE_OPTIONS="--max-old-space-size=12288"
 ARG FAST_BUILD=true
 ARG ENABLE_BACKGROUND_BLUR=false
 ARG ENABLE_SENTRY=false
