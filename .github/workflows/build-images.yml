@@ -46,7 +46,14 @@ jobs:
       - name: Report play image size
         run: |
           IMAGE="ghcr.io/clawpany/agentadventure-play:${{ github.sha }}"
-          SIZE_BYTES=$(skopeo inspect --raw docker://$IMAGE | jq '[.layers[].size] | add // 0')
+          RAW=$(skopeo inspect --raw docker://$IMAGE)
+          MEDIA_TYPE=$(echo "$RAW" | jq -r '.mediaType // ""')
+          if echo "$MEDIA_TYPE" | grep -qE 'index|list'; then
+            DIGEST=$(echo "$RAW" | jq -r '[.manifests[] | select(.platform.architecture=="amd64" and .platform.os=="linux")] | .[0].digest')
+            SIZE_BYTES=$(skopeo inspect --raw docker://ghcr.io/clawpany/agentadventure-play@${DIGEST} | jq '[.layers[].size] | add // 0')
+          else
+            SIZE_BYTES=$(echo "$RAW" | jq '[.layers[].size] | add // 0')
+          fi
           SIZE_MB=$(echo "$SIZE_BYTES" | awk '{printf "%.2f", $1/1024/1024}')
           echo "### 📦 play 镜像构建信息" >> $GITHUB_STEP_SUMMARY
           echo "- **镜像名称**: \`$IMAGE\`" >> $GITHUB_STEP_SUMMARY
@@ -89,7 +96,14 @@ jobs:
       - name: Report aio image size
         run: |
           IMAGE="ghcr.io/clawpany/agentadventure-aio:${{ github.sha }}"
-          SIZE_BYTES=$(skopeo inspect --raw docker://$IMAGE | jq '[.layers[].size] | add // 0')
+          RAW=$(skopeo inspect --raw docker://$IMAGE)
+          MEDIA_TYPE=$(echo "$RAW" | jq -r '.mediaType // ""')
+          if echo "$MEDIA_TYPE" | grep -qE 'index|list'; then
+            DIGEST=$(echo "$RAW" | jq -r '[.manifests[] | select(.platform.architecture=="amd64" and .platform.os=="linux")] | .[0].digest')
+            SIZE_BYTES=$(skopeo inspect --raw docker://ghcr.io/clawpany/agentadventure-aio@${DIGEST} | jq '[.layers[].size] | add // 0')
+          else
+            SIZE_BYTES=$(echo "$RAW" | jq '[.layers[].size] | add // 0')
+          fi
           SIZE_MB=$(echo "$SIZE_BYTES" | awk '{printf "%.2f", $1/1024/1024}')
           echo "### 📦 aio 镜像构建信息" >> $GITHUB_STEP_SUMMARY
           echo "- **镜像名称**: \`$IMAGE\`" >> $GITHUB_STEP_SUMMARY
