@@ -17,6 +17,8 @@ export const startSpan = noopPassthrough;
 export const addBreadcrumb = noop;
 export const configureScope = noopPassthrough;
 export const getCurrentHub = () => ({ getClient: () => null });
+export const feedbackIntegration = noop;
+export const browserTracingIntegration = noop;
 export default {
     init,
     captureException,
@@ -29,4 +31,6 @@ export default {
     addBreadcrumb,
     configureScope,
     getCurrentHub,
+    feedbackIntegration,
+    browserTracingIntegration,
 };

@@ -1,0 +1,89 @@
+###############################################################################
+# WorkAdventure All-in-One compose file
+#
+# Usage:
+#   docker compose -f docker-compose.aio.yaml up -d
+#
+# Access: http://localhost
+###############################################################################
+
+services:
+  workadventure:
+    build:
+      context: .
+      dockerfile: aio/Dockerfile
+    ports:
+      - "${AIO_PORT:-80}:80"
+    environment:
+      # ── Server identity ───────────────────────────────────────────────────
+      SERVER_NAME: "${SERVER_NAME:-WorkAdventure AIO}"
+      SERVER_MOTD: "${SERVER_MOTD:-}"
+      SERVER_ICON: "${SERVER_ICON:-}"
+
+      # ── Security ──────────────────────────────────────────────────────────
+      SECRET_KEY: "${SECRET_KEY:-thisismysecretkey}"
+      ADMIN_API_TOKEN: "${ADMIN_API_TOKEN:-}"
+      MAP_STORAGE_API_TOKEN: "${MAP_STORAGE_API_TOKEN:-aio-map-storage-token}"
+      ROOM_API_SECRET_KEY: "${ROOM_API_SECRET_KEY:-thisismyroomapisecretkey}"
+
+      # ── URLs (all go through the single AIO container) ────────────────────
+      PUSHER_URL: "${PUSHER_URL:-http://localhost}"
+      FRONT_URL: "${FRONT_URL:-http://localhost}"
+      PUBLIC_MAP_STORAGE_URL: "${PUBLIC_MAP_STORAGE_URL:-http://localhost/map-storage}"
+      PLAY_URL: "${PLAY_URL:-http://localhost}"
+      ICON_URL: "${ICON_URL:-http://localhost/icon}"
+
+      # ── Redis ─────────────────────────────────────────────────────────────
+      REDIS_HOST: redis
+
+      # ── Map editor ────────────────────────────────────────────────────────
+      ENABLE_MAP_EDITOR: "${ENABLE_MAP_EDITOR:-true}"
+
+      # ── Chat ──────────────────────────────────────────────────────────────
+      ENABLE_CHAT: "${ENABLE_CHAT:-true}"
+      ENABLE_CHAT_UPLOAD: "${ENABLE_CHAT_UPLOAD:-true}"
+
+      # ── Video/Audio ───────────────────────────────────────────────────────
+      JITSI_URL: "${JITSI_URL:-}"
+      STUN_SERVER: "${STUN_SERVER:-}"
+      TURN_SERVER: "${TURN_SERVER:-}"
+      TURN_STATIC_AUTH_SECRET: "${TURN_STATIC_AUTH_SECRET:-}"
+
+      # ── OpenID Connect ────────────────────────────────────────────────────
+      OPENID_CLIENT_ID: "${OPENID_CLIENT_ID:-}"
+      OPENID_CLIENT_SECRET: "${OPENID_CLIENT_SECRET:-}"
+      OPENID_CLIENT_ISSUER: "${OPENID_CLIENT_ISSUER:-}"
+      OPENID_SCOPE: "${OPENID_SCOPE:-openid profile email}"
+
+      # ── Feature flags (set to "true" to enable) ──────────────────────────
+      DISABLE_ANONYMOUS: "${DISABLE_ANONYMOUS:-false}"
+      FEATURE_FLAG_BROADCAST_AREAS: "${FEATURE_FLAG_BROADCAST_AREAS:-true}"
+      STORE_VARIABLES_FOR_LOCAL_MAPS: "${STORE_VARIABLES_FOR_LOCAL_MAPS:-true}"
+
+      # ── Map storage auth ──────────────────────────────────────────────────
+      ENABLE_BASIC_AUTHENTICATION: "${ENABLE_BASIC_AUTHENTICATION:-true}"
+      AUTHENTICATION_USER: "${AUTHENTICATION_USER:-admin}"
+      AUTHENTICATION_PASSWORD: "${AUTHENTICATION_PASSWORD:-admin}"
+      ENABLE_BEARER_AUTHENTICATION: "${ENABLE_BEARER_AUTHENTICATION:-true}"
+      AUTHENTICATION_TOKEN: "${AUTHENTICATION_TOKEN:-aio-map-storage-token}"
+    volumes:
+      - maps-data:/maps
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
+volumes:
+  maps-data:
+  redis-data:

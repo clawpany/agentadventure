@@ -1,22 +1,26 @@
 
-# protobuf build
-FROM --platform=$BUILDPLATFORM node:20.18-bullseye-slim AS proto-builder
-WORKDIR /usr/src
-COPY messages/package-lock.json messages/package.json ./
-RUN npm ci
-COPY messages .
-COPY libs ./../libs
-RUN npm run tag-version && npm run ts-proto
-
-# typescript build
+# typescript build (includes protobuf generation)
 FROM --platform=$BUILDPLATFORM node:20.18-bullseye-slim AS builder
-ARG NODE_OPTIONS="--max-old-space-size=16384"
+ARG NODE_OPTIONS="--max-old-space-size=4096"
 ARG FAST_BUILD=true
 ARG ENABLE_BACKGROUND_BLUR=false
 ARG ENABLE_SENTRY=false
 ARG ENABLE_POSTHOG=false
 WORKDIR /usr/src
-RUN apt-get update && apt-get install -y git
+RUN sed -i 's|deb.debian.org|mirrors.aliyun.com|g' /etc/apt/sources.list && \
+    sed -i 's|security.debian.org|mirrors.aliyun.com|g' /etc/apt/sources.list && \
+    apt-get update && apt-get install -y --no-install-recommends git && \
+    rm -rf /var/lib/apt/lists/*
+RUN npm config set registry https://registry.npmmirror.com
+
+# 1) Install & run protobuf generation
+COPY messages/package-lock.json messages/package.json messages/
+RUN cd messages && npm ci
+COPY messages messages
+COPY libs ./libs
+RUN cd messages && npm run tag-version && npm run ts-proto
+
+# 2) Install workspace deps (cached until package.json/lock changes)
 COPY package.json package-lock.json ./
 COPY play/package.json play/package.json
 COPY play/packages/iframe-api-typings/package.json play/packages/iframe-api-typings/package.json
@@ -27,10 +31,9 @@ COPY libs/tailwind/package.json libs/tailwind/package.json
 COPY libs/store-utils/package.json libs/store-utils/package.json
 COPY libs/shared-utils/package.json libs/shared-utils/package.json
 RUN npm ci --workspace=workadventure-play --workspace=@workadventure/iframe-api-typings...
-COPY libs ./libs
-COPY --from=proto-builder /usr/libs/messages/src ./libs/messages/src
+
+# 3) Copy source and build
 COPY play ./play
-COPY --from=proto-builder /usr/src/generated play/src/messages/generated
 ENV NODE_ENV=production
 RUN --mount=type=secret,id=SENTRY_RELEASE \
     --mount=type=secret,id=SENTRY_URL \
@@ -52,13 +55,17 @@ RUN --mount=type=secret,id=SENTRY_RELEASE \
     cd play && \
     npm run typesafe-i18n && \
     npm run build-iframe-api && \
-    SENTRY_RELEASE=$SENTRY_RELEASE SENTRY_URL=$SENTRY_URL SENTRY_AUTH_TOKEN=$SENTRY_AUTH_TOKEN SENTRY_ORG=$SENTRY_ORG SENTRY_PROJECT=$SENTRY_PROJECT SENTRY_ENVIRONMENT=$SENTRY_ENVIRONMENT npm run build
+    npm run build
 
 # final production image
 FROM node:20.18-bullseye-slim
 EXPOSE 3000
 WORKDIR /usr/src
-RUN apt-get update && apt-get install -y git curl
+RUN sed -i 's|deb.debian.org|mirrors.aliyun.com|g' /etc/apt/sources.list && \
+    sed -i 's|security.debian.org|mirrors.aliyun.com|g' /etc/apt/sources.list && \
+    apt-get update && apt-get install -y --no-install-recommends git python3 make g++ cmake && \
+    rm -rf /var/lib/apt/lists/*
+RUN npm config set registry https://registry.npmmirror.com
 COPY package.json package-lock.json ./
 COPY play/package.json play/package.json
 COPY play/packages/iframe-api-typings/package.json play/packages/iframe-api-typings/package.json
@@ -89,7 +96,7 @@ COPY --from=builder /usr/src/libs /usr/src/libs
 COPY --from=builder --chown=node:node /usr/src/play /usr/src/play
 WORKDIR /usr/src/play
 
-HEALTHCHECK --interval=10s --timeout=7s --start-period=10s --retries=15 CMD curl -f http://localhost:3000/ping || exit 1
+HEALTHCHECK --interval=10s --timeout=7s --start-period=10s --retries=15 CMD node -e "fetch('http://localhost:3000/ping').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"
 
 USER node
 CMD ["npm", "run", "start"]
