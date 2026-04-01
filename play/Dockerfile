@@ -12,12 +12,16 @@ RUN npm run tag-version && npm run ts-proto
 FROM --platform=$BUILDPLATFORM node:20.18-bullseye-slim AS builder
 # Default to 6GB which is safer for 8GB Docker Desktop environments. 
 # If your machine allows, override this with 16384 during build.
-ARG NODE_OPTIONS="--max-old-space-size=6144"
-ARG FAST_BUILD=""
+ARG NODE_OPTIONS="--max-old-space-size=12288"
+ARG FAST_BUILD=true
+ARG ENABLE_BACKGROUND_BLUR=false
+ARG ENABLE_SENTRY=false
+ARG ENABLE_POSTHOG=false
 WORKDIR /usr/src
 RUN sed -i 's/deb.debian.org/mirrors.aliyun.com/g' /etc/apt/sources.list && \
     sed -i 's/security.debian.org/mirrors.aliyun.com/g' /etc/apt/sources.list && \
     apt-get update && apt-get install -y git build-essential python3
+RUN npm config set registry https://registry.npmmirror.com
 COPY package.json package-lock.json ./
 COPY play/package.json play/package.json
 COPY play/packages/iframe-api-typings/package.json play/packages/iframe-api-typings/package.json
@@ -57,6 +61,9 @@ RUN --mount=type=secret,id=SENTRY_RELEASE \
     export NODE_OPTIONS="$NODE_OPTIONS" && \
     export DISABLE_LEGACY_BROWSERS="$FAST_BUILD" && \
     export GENERATE_SOURCEMAP=false && \
+    export ENABLE_BACKGROUND_BLUR="$ENABLE_BACKGROUND_BLUR" && \
+    export ENABLE_SENTRY="$ENABLE_SENTRY" && \
+    export ENABLE_POSTHOG="$ENABLE_POSTHOG" && \
     cd play && \
     npm run typesafe-i18n && \
     npm run build-iframe-api && \
@@ -67,8 +74,9 @@ FROM node:20.18-bullseye-slim
 EXPOSE 3000
 WORKDIR /usr/src
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends git curl && \
+    apt-get install -y --no-install-recommends git python3 make g++ cmake && \
     rm -rf /var/lib/apt/lists/*
+RUN npm config set registry https://registry.npmmirror.com
 COPY package.json package-lock.json ./
 COPY play/package.json play/package.json
 COPY play/packages/iframe-api-typings/package.json play/packages/iframe-api-typings/package.json
@@ -78,14 +86,28 @@ COPY libs/math-utils/package.json libs/math-utils/package.json
 COPY libs/tailwind/package.json libs/tailwind/package.json
 COPY libs/store-utils/package.json libs/store-utils/package.json
 COPY libs/shared-utils/package.json libs/shared-utils/package.json
+COPY play/scripts/conditional-install.sh play/scripts/conditional-install.sh
+ARG ENABLE_BACKGROUND_BLUR=false
+ARG ENABLE_S3_RECORDING=false
+ARG ENABLE_SWAGGER=false
+ARG ENABLE_SENTRY=false
+ARG ENABLE_POSTHOG=false
 ENV NODE_ENV=production
 ENV UWS_HTTP_MAX_HEADERS_SIZE=16384
-RUN npm ci --omit=dev --workspace workadventure-play
+ENV ENABLE_SENTRY=${ENABLE_SENTRY}
+ENV ENABLE_S3_RECORDING=${ENABLE_S3_RECORDING}
+RUN ENABLE_BACKGROUND_BLUR=$ENABLE_BACKGROUND_BLUR \
+    ENABLE_S3_RECORDING=$ENABLE_S3_RECORDING \
+    ENABLE_SWAGGER=$ENABLE_SWAGGER \
+    ENABLE_SENTRY=$ENABLE_SENTRY \
+    ENABLE_POSTHOG=$ENABLE_POSTHOG \
+    sh play/scripts/conditional-install.sh && \
+    npm ci --omit=dev --workspace workadventure-play
 COPY --from=builder /usr/src/libs /usr/src/libs
 COPY --from=builder --chown=node:node /usr/src/play /usr/src/play
 WORKDIR /usr/src/play
 
-HEALTHCHECK --interval=10s --timeout=7s --start-period=10s --retries=15 CMD curl -f http://localhost:3000/ping || exit 1
+HEALTHCHECK --interval=10s --timeout=7s --start-period=10s --retries=15 CMD node -e "fetch('http://localhost:3000/ping').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"
 
 USER node
 CMD ["npm", "run", "start"]

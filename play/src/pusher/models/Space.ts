@@ -1,4 +1,4 @@
-import * as Sentry from "@sentry/node";
+import Sentry from "../utils/sentry";
 import type { FilterType, UpdateSpaceUserMessage, SetPlayerDetailsMessage } from "@workadventure/messages";
 import { SpaceUser, AvailabilityStatus } from "@workadventure/messages";
 import Debug from "debug";

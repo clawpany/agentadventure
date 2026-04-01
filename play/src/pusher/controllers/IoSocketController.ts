@@ -8,7 +8,7 @@ import {
     ServerToClientMessage,
 } from "@workadventure/messages";
 import { JsonWebTokenError } from "jsonwebtoken";
-import * as Sentry from "@sentry/node";
+import Sentry from "../utils/sentry";
 import type { TemplatedApp, WebSocket } from "uWebSockets.js";
 import { asError } from "catch-unknown";
 import Debug from "debug";

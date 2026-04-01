@@ -1,6 +1,6 @@
 import type { RoomApiServer as RoomApiServerInterface } from "@workadventure/messages/src/ts-proto-generated/room-api";
 import { Status } from "@grpc/grpc-js/build/src/constants";
-import * as Sentry from "@sentry/node";
+import Sentry from "../pusher/utils/sentry";
 import { apiClientRepository } from "../pusher/services/ApiClientRepository";
 import { GRPC_MAX_MESSAGE_SIZE } from "./../pusher/enums/EnvironmentVariable";
 import AuthenticationGuard from "./guards/AuthenticationGuard";

@@ -7,7 +7,7 @@ import type {
     SubMessage,
 } from "@workadventure/messages";
 import { noUndefined, SpaceUser } from "@workadventure/messages";
-import * as Sentry from "@sentry/node";
+import Sentry from "../utils/sentry";
 import debug from "debug";
 import { merge } from "lodash";
 import { applyFieldMask } from "protobuf-fieldmask";

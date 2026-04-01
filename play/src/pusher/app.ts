@@ -2,7 +2,7 @@ import fs from "fs";
 import type { Application } from "express";
 import express from "express";
 import cookieParser from "cookie-parser";
-import * as Sentry from "@sentry/node";
+import Sentry from "./utils/sentry";
 import cors from "cors";
 import uWebsockets from "uWebSockets.js";
 import { adminApi } from "./services/AdminApi";
@@ -14,7 +14,7 @@ import { DebugController } from "./controllers/DebugController";
 import { AdminController } from "./controllers/AdminController";
 import { OpenIdProfileController } from "./controllers/OpenIdProfileController";
 import { WokaListController } from "./controllers/WokaListController";
-import { SwaggerController } from "./controllers/SwaggerController";
+// SwaggerController is lazy-loaded below when ENABLE_OPENAPI_ENDPOINT is true
 import {
     ALLOWED_CORS_ORIGIN,
     ENABLE_OPENAPI_ENDPOINT,
@@ -100,7 +100,13 @@ class App {
         new LocalScriptController(this.app);
 
         if (ENABLE_OPENAPI_ENDPOINT) {
-            new SwaggerController(this.app);
+            import("./controllers/SwaggerController")
+                .then(({ SwaggerController }) => {
+                    new SwaggerController(this.app);
+                })
+                .catch((e) => {
+                    console.warn("[Swagger] swagger-jsdoc/swagger-ui-dist not installed. Swagger UI disabled.", e);
+                });
         }
         new FrontController(this.app);
         new UserController(this.app);

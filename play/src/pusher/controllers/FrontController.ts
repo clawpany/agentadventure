@@ -2,7 +2,7 @@ import fs from "fs";
 import type { Request, Response, Application } from "express";
 import Mustache from "mustache";
 import { uuid } from "stanza/Utils";
-import * as Sentry from "@sentry/node";
+import Sentry from "../utils/sentry";
 import { z } from "zod";
 import Debug from "debug";
 import { MetaTagsBuilder } from "../services/MetaTagsBuilder";

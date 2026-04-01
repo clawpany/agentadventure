@@ -1,6 +1,6 @@
 import fs from "fs";
 import process from "process";
-import * as Sentry from "@sentry/node";
+import Sentry from "./pusher/utils/sentry";
 import * as grpc from "@grpc/grpc-js";
 import { RoomApiService } from "@workadventure/messages/src/ts-proto-generated/room-api";
 import { setErrorHandler } from "@workadventure/shared-utils";
