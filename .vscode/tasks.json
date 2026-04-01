@@ -1,0 +1,16 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Docker Build Play (Matrix Fix)",
+            "type": "shell",
+            "command": "docker build --build-arg FAST_BUILD=1 -t wa:matrix-fix -f play/Dockerfile .",
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "problemMatcher": [],
+            "detail": "Build the play service docker image with FAST_BUILD=1"
+        }
+    ]
+}

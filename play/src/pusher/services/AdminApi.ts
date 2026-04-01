@@ -111,6 +111,10 @@ export const isFetchMemberDataByUuidSuccessResponse = z.object({
     world: extendApi(z.string(), {
         description: "name of the world",
     }),
+    locale: extendApi(z.string().nullable().optional(), {
+        description: "The locale of the fetched user.",
+        example: "en",
+    }),
     chatID: extendApi(z.string().optional(), {
         description: "ChatId of user",
     }),
@@ -126,7 +130,50 @@ export const isFetchWorldChatMembers = z.object({
 });
 export type FetchMemberDataByUuidSuccessResponse = z.infer<typeof isFetchMemberDataByUuidSuccessResponse>;
 
-export const isFetchMemberDataByUuidResponse = z.union([isFetchMemberDataByUuidSuccessResponse, ErrorApiData]);
+const isFetchMemberDataByUuidResponseRaw = z.union([isFetchMemberDataByUuidSuccessResponse, ErrorApiData]);
+
+export const isFetchMemberDataByUuidResponse = z.any().superRefine((data, ctx) => {
+    const isObject = z.record(z.string(), z.unknown()).safeParse(data);
+    if (!isObject.success) {
+        ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: "Expected an object",
+        });
+        return;
+    }
+
+    if (data.status === "ok") {
+        const result = isFetchMemberDataByUuidSuccessResponse.safeParse(data);
+        if (!result.success) {
+            result.error.issues.forEach((issue) => {
+                ctx.addIssue({
+                    ...issue,
+                    path: [...ctx.path, ...issue.path],
+                });
+            });
+        }
+    } else if (data.status === "error") {
+        const result = ErrorApiData.safeParse(data);
+        if (!result.success) {
+            result.error.issues.forEach((issue) => {
+                ctx.addIssue({
+                    ...issue,
+                    path: [...ctx.path, ...issue.path],
+                });
+            });
+        }
+    } else {
+        const result = isFetchMemberDataByUuidResponseRaw.safeParse(data);
+        if (!result.success) {
+            result.error.issues.forEach((issue) => {
+                ctx.addIssue({
+                    ...issue,
+                    path: [...ctx.path, ...issue.path],
+                });
+            });
+        }
+    }
+}) as unknown as typeof isFetchMemberDataByUuidResponseRaw;
 
 export type FetchMemberDataByUuidResponse = z.infer<typeof isFetchMemberDataByUuidResponse>;
 

@@ -30,7 +30,11 @@ const env: EnvironmentVariables = envChecking.data;
 export const PLAY_URL = env.PLAY_URL;
 export const MINIMUM_DISTANCE = env.MINIMUM_DISTANCE;
 export const GROUP_RADIUS = env.GROUP_RADIUS;
-export const ADMIN_API_URL = env.ADMIN_API_URL;
+export const ADMIN_API_URL = env.ADMIN_API_URL
+    ? env.ADMIN_API_URL.endsWith("/")
+        ? env.ADMIN_API_URL
+        : env.ADMIN_API_URL + "/"
+    : undefined;
 export const ADMIN_API_RETRY_DELAY = parseInt(process.env.ADMIN_API_RETRY_DELAY || "500");
 export const ADMIN_API_TOKEN = env.ADMIN_API_TOKEN;
 export const CPU_OVERHEAT_THRESHOLD = env.CPU_OVERHEAT_THRESHOLD;
@@ -58,7 +62,11 @@ export const ENABLE_CHAT = env.ENABLE_CHAT;
 export const ENABLE_CHAT_UPLOAD = env.ENABLE_CHAT_UPLOAD;
 export const ENABLE_TELEMETRY = env.ENABLE_TELEMETRY;
 export const SECURITY_EMAIL = env.SECURITY_EMAIL;
-export const TELEMETRY_URL = env.TELEMETRY_URL;
+export const TELEMETRY_URL = env.TELEMETRY_URL
+    ? env.TELEMETRY_URL.endsWith("/")
+        ? env.TELEMETRY_URL
+        : env.TELEMETRY_URL + "/"
+    : "https://stats.workadventu.re/";
 
 export const SENTRY_DSN = env.SENTRY_DSN;
 export const SENTRY_ENVIRONMENT = env.SENTRY_ENVIRONMENT;

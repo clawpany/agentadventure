@@ -1,6 +1,12 @@
 import {z} from "zod";
 import {extendApi} from "@anatine/zod-openapi";
-import {ErrorApiData} from "./ErrorApiData";
+import {
+  ErrorApiData, // Keep this if ErrorApiData is still used elsewhere or for its type
+  isErrorApiErrorData, // Assuming these are the schemas, not just type guards
+  isErrorApiRetryData,
+  isErrorApiRedirectData,
+  isErrorApiUnauthorizedData,
+} from "./ErrorApiData";
 import {WokaDetail} from "./PlayerTextures";
 
 export const MeSuccessResponse = extendApi(
@@ -71,5 +77,52 @@ export const MeSuccessResponse = extendApi(
 
 export type MeSuccessResponse = z.infer<typeof MeSuccessResponse>;
 
-export const MeResponse = z.union([MeSuccessResponse, ErrorApiData]);
+const MeResponseRaw = z.union([
+    MeSuccessResponse,
+    ErrorApiData
+]);
+
+export const MeResponse = z.any().superRefine((data, ctx) => {
+    const isObject = z.record(z.string(), z.unknown()).safeParse(data);
+    if (!isObject.success) {
+        ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: "Expected an object",
+        });
+        return;
+    }
+
+    if (data.status === "ok") {
+        const result = MeSuccessResponse.safeParse(data);
+        if (!result.success) {
+            result.error.issues.forEach((issue) => {
+                ctx.addIssue({
+                    ...issue,
+                    path: [...ctx.path, ...issue.path],
+                });
+            });
+        }
+    } else if (data.status === "error") {
+        const result = ErrorApiData.safeParse(data);
+        if (!result.success) {
+            result.error.issues.forEach((issue) => {
+                ctx.addIssue({
+                    ...issue,
+                    path: [...ctx.path, ...issue.path],
+                });
+            });
+        }
+    } else {
+        // Use raw union parse to get the default error if status is neither "ok" nor "error"
+        const result = MeResponseRaw.safeParse(data);
+        if (!result.success) {
+            result.error.issues.forEach((issue) => {
+                ctx.addIssue({
+                    ...issue,
+                    path: [...ctx.path, ...issue.path],
+                });
+            });
+        }
+    }
+}) as unknown as typeof MeResponseRaw;
 export type MeResponse = z.infer<typeof MeResponse>;

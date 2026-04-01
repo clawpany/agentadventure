@@ -3,17 +3,21 @@
 FROM --platform=$BUILDPLATFORM node:20.18-bullseye-slim AS proto-builder
 WORKDIR /usr/src
 COPY messages/package-lock.json messages/package.json ./
-RUN npm ci
+RUN --mount=type=cache,target=/root/.npm npm ci
 COPY messages .
 COPY libs ./../libs
 RUN npm run tag-version && npm run ts-proto
 
 # typescript build
 FROM --platform=$BUILDPLATFORM node:20.18-bullseye-slim AS builder
-ARG NODE_OPTIONS="--max-old-space-size=16384"
+# Default to 6GB which is safer for 8GB Docker Desktop environments. 
+# If your machine allows, override this with 16384 during build.
+ARG NODE_OPTIONS="--max-old-space-size=6144"
 ARG FAST_BUILD=""
 WORKDIR /usr/src
-RUN apt-get update && apt-get install -y git
+RUN sed -i 's/deb.debian.org/mirrors.aliyun.com/g' /etc/apt/sources.list && \
+    sed -i 's/security.debian.org/mirrors.aliyun.com/g' /etc/apt/sources.list && \
+    apt-get update && apt-get install -y git build-essential python3
 COPY package.json package-lock.json ./
 COPY play/package.json play/package.json
 COPY play/packages/iframe-api-typings/package.json play/packages/iframe-api-typings/package.json
@@ -23,7 +27,14 @@ COPY libs/math-utils/package.json libs/math-utils/package.json
 COPY libs/tailwind/package.json libs/tailwind/package.json
 COPY libs/store-utils/package.json libs/store-utils/package.json
 COPY libs/shared-utils/package.json libs/shared-utils/package.json
-RUN npm ci --workspace=workadventure-play --workspace=@workadventure/iframe-api-typings...
+
+# Cache npm dependencies
+RUN --mount=type=cache,target=/root/.npm \
+    npm ci --workspace=workadventure-play --workspace=@workadventure/iframe-api-typings \
+    --workspace=@workadventure/messages --workspace=@workadventure/map-editor \
+    --workspace=@workadventure/math-utils --workspace=@workadventure/tailwind \
+    --workspace=@workadventure/store-utils --workspace=@workadventure/shared-utils
+
 COPY libs ./libs
 COPY --from=proto-builder /usr/libs/messages/src ./libs/messages/src
 COPY play ./play
@@ -35,6 +46,8 @@ RUN --mount=type=secret,id=SENTRY_RELEASE \
     --mount=type=secret,id=SENTRY_ORG \
     --mount=type=secret,id=SENTRY_PROJECT \
     --mount=type=secret,id=SENTRY_ENVIRONMENT \
+    --mount=type=cache,target=/root/.npm \
+    --mount=type=cache,target=/usr/src/play/node_modules/.vite \
     export SENTRY_RELEASE=$(cat /run/secrets/SENTRY_RELEASE) && \
     export SENTRY_URL=$(cat /run/secrets/SENTRY_URL) && \
     export SENTRY_AUTH_TOKEN=$(cat /run/secrets/SENTRY_AUTH_TOKEN) && \
@@ -43,6 +56,7 @@ RUN --mount=type=secret,id=SENTRY_RELEASE \
     export SENTRY_ENVIRONMENT=$(cat /run/secrets/SENTRY_ENVIRONMENT) && \
     export NODE_OPTIONS="$NODE_OPTIONS" && \
     export DISABLE_LEGACY_BROWSERS="$FAST_BUILD" && \
+    export GENERATE_SOURCEMAP=false && \
     cd play && \
     npm run typesafe-i18n && \
     npm run build-iframe-api && \
@@ -52,7 +66,9 @@ RUN --mount=type=secret,id=SENTRY_RELEASE \
 FROM node:20.18-bullseye-slim
 EXPOSE 3000
 WORKDIR /usr/src
-RUN apt-get update && apt-get install -y git curl
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends git curl && \
+    rm -rf /var/lib/apt/lists/*
 COPY package.json package-lock.json ./
 COPY play/package.json play/package.json
 COPY play/packages/iframe-api-typings/package.json play/packages/iframe-api-typings/package.json

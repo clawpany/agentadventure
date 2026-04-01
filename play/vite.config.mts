@@ -62,7 +62,7 @@ export default defineConfig(({ mode }) => {
                 compiler: "svelte",
             }),
             // Conditional plugin inclusion
-            ...(env.DISABLE_LEGACY_BROWSERS === "true"
+            ...(env.DISABLE_LEGACY_BROWSERS === "true" || env.DISABLE_LEGACY_BROWSERS === "1"
                 ? []
                 : [
                       legacy({

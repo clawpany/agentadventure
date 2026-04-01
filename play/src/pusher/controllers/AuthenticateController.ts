@@ -217,11 +217,15 @@ export class AuthenticateController extends BaseHttpController {
                     //if not nonce and code, anonymous user connected
                     //get data with identifier and return token
                     res.json({
+                        status: "ok",
                         authToken: token,
                         username: authTokenData?.username,
-                        locale: authTokenData?.locale,
-                        // TODO: replace ... with each property
-                        ...resUserData,
+                        userUuid: resUserData.userUuid,
+                        email: resUserData.email,
+                        locale: authTokenData?.locale ?? resUserData.locale,
+                        visitCardUrl: resUserData.visitCardUrl,
+                        isCharacterTexturesValid: resUserData.isCharacterTexturesValid,
+                        isCompanionTextureValid: resUserData.isCompanionTextureValid,
                         matrixUserId: authTokenData?.matrixUserId,
                         matrixServerUrl: MATRIX_PUBLIC_URI,
                     } satisfies MeResponse);
@@ -231,14 +235,17 @@ export class AuthenticateController extends BaseHttpController {
                 try {
                     const resCheckTokenAuth = await openIDClient.checkTokenAuth(authTokenData.accessToken);
                     res.json({
-                        username: authTokenData?.username,
+                        status: "ok",
+                        userUuid: resUserData.userUuid,
+                        email: resUserData.email,
+                        username: resUserData.username ?? authTokenData?.username,
                         authToken: token,
-                        locale: authTokenData?.locale,
+                        locale: resUserData.locale ?? authTokenData?.locale,
+                        visitCardUrl: resUserData.visitCardUrl,
+                        isCharacterTexturesValid: resUserData.isCharacterTexturesValid,
+                        isCompanionTextureValid: resUserData.isCompanionTextureValid,
                         matrixUserId: authTokenData?.matrixUserId,
                         matrixServerUrl: (resCheckTokenAuth.matrix_url as string | undefined) ?? MATRIX_PUBLIC_URI,
-                        // TODO: replace ... with each property
-                        ...resUserData,
-                        ...resCheckTokenAuth,
                     } satisfies MeResponse);
                 } catch (err) {
                     console.warn("Error while checking token auth", err);
