@@ -1,4 +1,4 @@
-import { jwtVerify, SignJWT, errors } from "jose";
+import Jwt from "jsonwebtoken";
 import z from "zod";
 import { ADMIN_SOCKETS_TOKEN, SECRET_KEY } from "../enums/EnvironmentVariable";
 
@@ -23,43 +23,32 @@ export const AdminSocketTokenData = z.object({
 export type AdminSocketTokenData = z.infer<typeof AdminSocketTokenData>;
 export const tokenInvalidException = "tokenInvalid";
 
-const secret = new TextEncoder().encode(SECRET_KEY ?? "");
-const adminSocketsSecret = new TextEncoder().encode(ADMIN_SOCKETS_TOKEN ?? "");
-
 export class JWTTokenManager {
-    public async verifyAdminSocketToken(token: string): Promise<AdminSocketTokenData> {
+    public verifyAdminSocketToken(token: string): AdminSocketTokenData {
         if (!ADMIN_SOCKETS_TOKEN) {
             throw new Error("Missing environment variable ADMIN_SOCKETS_TOKEN");
         }
 
-        const verifiedToken = (await jwtVerify(token, adminSocketsSecret)).payload;
+        const verifiedToken = Jwt.verify(token, ADMIN_SOCKETS_TOKEN);
 
         return AdminSocketTokenData.parse(verifiedToken);
     }
 
-    public async createAuthToken(
+    public createAuthToken(
         identifier: string,
         accessToken?: string,
         username?: string,
         locale?: string,
         tags?: string[],
         matrixUserId?: string
-    ): Promise<string> {
-        return new SignJWT({ identifier, accessToken, username, locale, tags, matrixUserId })
-            .setExpirationTime("30d")
-            .setProtectedHeader({ alg: "HS256" })
-            .sign(secret);
+    ): string {
+        return Jwt.sign({ identifier, accessToken, username, locale, tags, matrixUserId }, SECRET_KEY, {
+            expiresIn: "30d",
+        });
     }
 
-    public async verifyJWTToken(token: string, ignoreExpiration = false): Promise<AuthTokenData> {
-        try {
-            return AuthTokenData.parse((await jwtVerify(token, secret)).payload);
-        } catch (error) {
-            if (ignoreExpiration && error instanceof errors.JWTExpired) {
-                return AuthTokenData.parse(error.payload);
-            }
-            throw new errors.JWTInvalid("Token is invalid");
-        }
+    public verifyJWTToken(token: string, ignoreExpiration = false): AuthTokenData {
+        return AuthTokenData.parse(Jwt.verify(token, SECRET_KEY, { ignoreExpiration }));
     }
 }
 

@@ -395,7 +395,7 @@ class LocalAdmin implements AdminInterface {
             return mapDescriptions;
         }
 
-        return Promise.reject(new Error("No admin backoffice set!"));
+        return [];
     }
 
     getProfileUrl(accessToken: string, playUri: string): string {
@@ -417,7 +417,7 @@ class LocalAdmin implements AdminInterface {
     }
 
     getTagsList(roomUrl: string): Promise<string[]> {
-        return Promise.reject(new Error("No admin backoffice set!"));
+        return Promise.resolve([]);
     }
 
     saveName(userIdentifier: string, name: string, roomUrl: string): Promise<void> {
@@ -440,7 +440,7 @@ class LocalAdmin implements AdminInterface {
     }
 
     searchMembers(roomUrl: string, searchText: string): Promise<MemberData[]> {
-        return Promise.reject(new Error("No admin backoffice set!"));
+        return Promise.resolve([]);
     }
 
     getMember(memberUUID: string): Promise<MemberData> {

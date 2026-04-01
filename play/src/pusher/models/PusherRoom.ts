@@ -1,7 +1,7 @@
 import type { BatchToPusherRoomMessage, PusherToBackRoomMessage } from "@workadventure/messages";
 import Debug from "debug";
 import type { ClientDuplexStream } from "@grpc/grpc-js";
-import Sentry from "../utils/sentry";
+import * as Sentry from "@sentry/node";
 import type { WAMFileFormat } from "@workadventure/map-editor";
 
 import { GRPC_MAX_MESSAGE_SIZE } from "../enums/EnvironmentVariable";
@@ -184,19 +184,6 @@ export class PusherRoom {
                         // Zone-specific messages - forward to PositionDispatcher
                         case "zoneMessage": {
                             this.positionNotifier.handleZoneMessage(message.message.zoneMessage);
-                            break;
-                        }
-                        case "areaPropertyVariableMessage": {
-                            // Broadcast area property variable changes to all listeners
-                            const areaPropertyVariableMessage = message.message.areaPropertyVariableMessage;
-                            for (const listener of this.listeners) {
-                                listener.getUserData().emitInBatch({
-                                    message: {
-                                        $case: "areaPropertyVariableMessage",
-                                        areaPropertyVariableMessage: areaPropertyVariableMessage,
-                                    },
-                                });
-                            }
                             break;
                         }
                         default: {

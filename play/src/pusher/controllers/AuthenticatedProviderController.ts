@@ -1,6 +1,6 @@
 import type { Request, Response, Application } from "express";
 import { z } from "zod";
-import Sentry from "../utils/sentry";
+import * as Sentry from "@sentry/node";
 import Debug from "debug";
 import { validateQuery } from "../services/QueryValidator";
 import type { JWTTokenManager } from "../services/JWTTokenManager";
@@ -39,7 +39,7 @@ export abstract class AuthenticatedProviderController<T> extends BaseHttpControl
             }
             let uuid: string | undefined;
             try {
-                const jwtData = await this.jwtTokenManager.verifyJWTToken(token);
+                const jwtData = this.jwtTokenManager.verifyJWTToken(token);
                 // Let's set the "uuid" param
                 uuid = jwtData.identifier;
             } catch (e) {

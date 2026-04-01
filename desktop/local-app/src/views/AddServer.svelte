@@ -9,7 +9,7 @@
         try {
             await addServer();
         } catch(e) {
-            console.error(e);
+            console.log(e);
             error = e.message;
         }
     }

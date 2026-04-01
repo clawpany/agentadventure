@@ -1,11 +1,10 @@
-import { isDeepStrictEqual } from "util";
 import type { WamFile, WAMEntityData, WAMFileFormat } from "@workadventure/map-editor";
 import { EntityDataProperty, UpdateEntityCommand } from "@workadventure/map-editor";
+import * as jsonpatch from "fast-json-patch";
 import pLimit from "p-limit";
 import type { HookManager } from "../../Modules/HookManager";
 
 const limit = pLimit(10);
-
 export class UpdateEntityMapStorageCommand extends UpdateEntityCommand {
     constructor(
         wamFile: WamFile,
@@ -20,60 +19,59 @@ export class UpdateEntityMapStorageCommand extends UpdateEntityCommand {
     }
 
     public async execute(): Promise<WAMFileFormat | undefined> {
-        const oldProperties = this.oldConfig.properties ?? [];
-        const newProperties = this.newConfig.properties ?? [];
-
-        const oldById = new Map(oldProperties.map((property) => [property.id, property]));
-        const newById = new Map(newProperties.map((property) => [property.id, property]));
-
-        const promises: Promise<void>[] = [];
-
-        for (const newProperty of newProperties) {
-            const oldProperty = oldById.get(newProperty.id);
-
-            if (!oldProperty) {
-                const value = EntityDataProperty.safeParse(newProperty);
+        const patch = jsonpatch.compare(this.oldConfig, this.newConfig);
+        const promises = patch.reduce((acc: Promise<void>[], operation) => {
+            if (operation.op === "add" && operation.path.match(new RegExp("^/properties/*"))) {
+                const value = EntityDataProperty.safeParse(operation.value);
 
                 if (!value.success) {
-                    continue;
+                    return acc;
                 }
 
-                promises.push(
+                acc.push(
                     limit(async () => {
                         await this.hookManager.fireEntityPropertyAdd(this.newConfig, value.data, this.hostname);
                     })
                 );
-
-                continue;
             }
 
-            if (isDeepStrictEqual(oldProperty, newProperty)) {
-                continue;
+            if (operation.op === "remove" && operation.path.match(new RegExp("^/properties/*"))) {
+                const value = jsonpatch.getValueByPointer(this.oldConfig, operation.path) as EntityDataProperty;
+                if (!value) return acc;
+                acc.push(
+                    limit(async () => {
+                        await this.hookManager.fireEntityPropertyDelete(this.newConfig, value, this.hostname);
+                    })
+                );
             }
 
-            promises.push(
-                limit(async () => {
-                    await this.hookManager.fireEntityPropertyChange(
-                        this.newConfig,
-                        oldProperty,
-                        newProperty,
-                        this.hostname
-                    );
-                })
-            );
-        }
+            if (operation.op === "replace" && operation.path.match(new RegExp("^/properties/*"))) {
+                const match = operation.path.match(/^\/properties\/(\d+)\/*/);
 
-        for (const oldProperty of oldProperties) {
-            if (newById.has(oldProperty.id)) {
-                continue;
+                if (!match) return acc;
+
+                const propertyIndex = Number(match[1]);
+                const properties = this.newConfig.properties;
+
+                if (!properties) return acc;
+                const property = properties[propertyIndex];
+                const oldProperty = this.oldConfig.properties?.[propertyIndex];
+
+                if (!property || !oldProperty) return acc;
+
+                acc.push(
+                    limit(async () => {
+                        await this.hookManager.fireEntityPropertyChange(
+                            this.newConfig,
+                            oldProperty,
+                            property,
+                            this.hostname
+                        );
+                    })
+                );
             }
-
-            promises.push(
-                limit(async () => {
-                    await this.hookManager.fireEntityPropertyDelete(this.newConfig, oldProperty, this.hostname);
-                })
-            );
-        }
+            return acc;
+        }, []);
 
         try {
             await Promise.all(promises);

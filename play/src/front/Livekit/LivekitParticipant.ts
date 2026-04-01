@@ -240,7 +240,6 @@ export class LiveKitParticipant {
             volumeStore: writable(undefined),
             volume: writable(this.defaultVolume),
             closeStreamable: () => {},
-            canCloseStreamable: () => false,
             videoType: "video",
             webrtcStats: this.getWebrtcStats("video"),
         };
@@ -281,7 +280,6 @@ export class LiveKitParticipant {
             volumeStore: writable(undefined),
             volume: writable(this.defaultVolume),
             closeStreamable: () => {},
-            canCloseStreamable: () => false,
             videoType: "screenSharing",
             webrtcStats: this.getWebrtcStats("screenShare"),
         };

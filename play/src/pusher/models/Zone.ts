@@ -1,4 +1,4 @@
-import Sentry from "../utils/sentry";
+import * as Sentry from "@sentry/node";
 import type {
     CharacterTextureMessage,
     CompanionTextureMessage,

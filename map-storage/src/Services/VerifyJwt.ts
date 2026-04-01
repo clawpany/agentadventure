@@ -1,7 +1,7 @@
 import path from "path";
 import fs from "fs/promises";
 import type { Request, Response, NextFunction } from "express";
-import { jwtVerify } from "jose";
+import jwt from "jsonwebtoken";
 import z from "zod";
 import type { AreaData } from "@workadventure/map-editor";
 import { WAMFileFormat } from "@workadventure/map-editor";
@@ -26,9 +26,7 @@ export async function verifyJWT(req: Request, res: Response, next: NextFunction)
     }
 
     try {
-        const secret = new TextEncoder().encode(SECRET_KEY ?? "");
-        const decoded = (await jwtVerify(token, secret)).payload;
-
+        const decoded = jwt.verify(token, SECRET_KEY ?? "");
         const parsed = AuthTokenData.parse(decoded);
         let pathPrefix = PATH_PREFIX ?? "";
         if (!pathPrefix.endsWith("/")) {

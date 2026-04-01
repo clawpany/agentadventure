@@ -1,4 +1,4 @@
-import { Deferred } from "@workadventure/shared-utils";
+import { Deferred } from "ts-deferred";
 import { audioContextManager } from "../AudioContextManager";
 import audioWorkletProcessorUrl from "./OutputAudioWorkletProcessor.ts?worker&url";
 

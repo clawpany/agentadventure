@@ -3,10 +3,9 @@ import { get } from "svelte/store";
 import { isOutlineable } from "../../Utils/CustomTypeGuards";
 import type { Player } from "../Player/Player";
 import LL from "../../../i18n/i18n-svelte";
-
+import { isMediaBreakpointUp } from "../../Utils/BreakpointsUtils";
 import { RemotePlayer } from "../Entity/RemotePlayer";
 import { Entity } from "../ECS/Entity";
-import { touchScreenManager } from "../../Touch/TouchScreenManager";
 import type { ActivatableInterface } from "./ActivatableInterface";
 
 export class ActivatablesManager {
@@ -20,7 +19,7 @@ export class ActivatablesManager {
     private canSelectByDistance = true;
 
     private readonly outlineColor = 0xf9e81e;
-    private readonly directionalActivationPositionShift = 24;
+    private readonly directionalActivationPositionShift = 50;
 
     constructor(currentPlayer: Player) {
         this.currentPlayer = currentPlayer;
@@ -90,7 +89,7 @@ export class ActivatablesManager {
             this.selectedActivatableObjectByDistance?.characterCloseByOutline(this.outlineColor);
             if (this.selectedActivatableObjectByDistance instanceof RemotePlayer == false) {
                 // TODO: improve this to show multiple trigger messages
-                let triggerMessage: string = touchScreenManager.detectPrimaryTouchDevice()
+                let triggerMessage: string = isMediaBreakpointUp("md")
                     ? get(LL).trigger.mobile.object()
                     : get(LL).trigger.object();
                 if (this.selectedActivatableObjectByDistance instanceof Entity) {
@@ -111,22 +110,38 @@ export class ActivatablesManager {
     }
 
     public updateActivatableObjectsDistances(objects: ActivatableInterface[]): void {
+        const playerRect = this.currentPlayer.getCollisionRectangle();
         this.activatableObjectsDistances.clear();
-        const playerCenter = this.currentPlayer.getDirectionalActivationPosition(
-            this.directionalActivationPositionShift
-        );
-        const currentPlayerPos = this.currentPlayer.getDirectionalActivationPosition(0);
         for (const object of objects) {
             let distance: number;
             if (object instanceof Entity) {
+                // Use rectangle-based distance calculation for entities
                 const entityRect = object.getActivationRectangle();
-                distance = MathUtils.distanceBetweenPointAndRectangle(playerCenter, entityRect);
+                distance = MathUtils.distanceBetweenRectangles(playerRect, entityRect);
             } else {
                 // Fallback to point-based distance for other activatable objects (like RemotePlayer)
+                const currentPlayerPos = this.currentPlayer.getDirectionalActivationPosition(0);
                 distance = MathUtils.distanceBetween(currentPlayerPos, object.getPosition());
             }
             this.activatableObjectsDistances.set(object, distance);
         }
+    }
+
+    public updateDistanceForSingleActivatableObject(object: ActivatableInterface): void {
+        const playerRect = this.currentPlayer.getCollisionRectangle();
+        let distance: number;
+        if (object instanceof Entity) {
+            // Use rectangle-based distance calculation for entities
+            const entityRect = object.getActivationRectangle();
+            distance = MathUtils.distanceBetweenRectangles(playerRect, entityRect);
+        } else {
+            // Fallback to point-based distance for other activatable objects
+            distance = MathUtils.distanceBetween(
+                this.currentPlayer.getDirectionalActivationPosition(this.directionalActivationPositionShift),
+                object.getPosition()
+            );
+        }
+        this.activatableObjectsDistances.set(object, distance);
     }
 
     public disableSelectingByDistance(): void {
@@ -151,14 +166,12 @@ export class ActivatablesManager {
     }
 
     private findNearestActivatableObject(): ActivatableInterface | undefined {
-        const playerCenter = this.currentPlayer.getDirectionalActivationPosition(
-            this.directionalActivationPositionShift
-        );
+        const playerCenter = this.currentPlayer.getPosition();
         let shortestDistanceToCenter = Infinity;
         let closestObject: ActivatableInterface | undefined = undefined;
 
         for (const [object, distance] of this.activatableObjectsDistances.entries()) {
-            // For entities, distance 0 means the activation point lies inside the activation rectangle
+            // For rectangle-based detection, distance of 0 means rectangles overlap/touch
             // For point-based detection (fallback), we still check against activationRadius
             const isInRange =
                 object instanceof Entity

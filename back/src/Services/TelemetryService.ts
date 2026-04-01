@@ -12,7 +12,7 @@ class TelemetryService {
 
     private async sendTelemetryInfo(): Promise<void> {
         try {
-            const url = new URL("/api/telemetry", this.url);
+            const url = new URL("api/telemetry", this.url);
             const response: AxiosResponse = await axios.post(url.toString(), {
                 version: version,
                 play_url: PLAY_URL,

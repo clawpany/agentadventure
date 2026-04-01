@@ -7,8 +7,8 @@ import {
     ServerToClientMessage as ServerToClientMessageTsProto,
     ServerToClientMessage,
 } from "@workadventure/messages";
-import { errors } from "jose";
-import Sentry from "../utils/sentry";
+import { JsonWebTokenError } from "jsonwebtoken";
+import * as Sentry from "@sentry/node";
 import type { TemplatedApp, WebSocket } from "uWebSockets.js";
 import { asError } from "catch-unknown";
 import Debug from "debug";
@@ -93,7 +93,7 @@ export class IoSocketController {
                 );
                 ws.getUserData().disconnecting = false;
             },
-            message: async (ws, arrayBuffer): Promise<void> => {
+            message: (ws, arrayBuffer): void => {
                 try {
                     const message: AdminMessageInterface = JSON.parse(
                         new TextDecoder("utf-8").decode(new Uint8Array(arrayBuffer))
@@ -125,7 +125,7 @@ export class IoSocketController {
                     let data: AdminSocketTokenData;
 
                     try {
-                        data = await jwtTokenManager.verifyAdminSocketToken(token);
+                        data = jwtTokenManager.verifyAdminSocketToken(token);
                     } catch (e) {
                         console.error("Admin socket access refused for token: " + token, e);
                         ws.send(
@@ -341,7 +341,7 @@ export class IoSocketController {
                                 ? [query.characterTextureIds]
                                 : query.characterTextureIds;
 
-                        const tokenData = token ? await jwtTokenManager.verifyJWTToken(token) : null;
+                        const tokenData = token ? jwtTokenManager.verifyJWTToken(token) : null;
 
                         if (DISABLE_ANONYMOUS && !tokenData) {
                             throw new Error("Expecting token");
@@ -530,7 +530,7 @@ export class IoSocketController {
                         );
                     } catch (e) {
                         if (e instanceof Error) {
-                            if (!(e instanceof errors.JWTInvalid || e instanceof errors.JWTExpired)) {
+                            if (!(e instanceof JsonWebTokenError)) {
                                 Sentry.captureException(e);
                                 console.error(e);
                             }
@@ -541,10 +541,7 @@ export class IoSocketController {
                             res.upgrade(
                                 {
                                     rejected: true,
-                                    reason:
-                                        e instanceof errors.JWTInvalid || e instanceof errors.JWTExpired
-                                            ? tokenInvalidException
-                                            : null,
+                                    reason: e instanceof JsonWebTokenError ? tokenInvalidException : null,
                                     message: e.message,
                                     roomId,
                                 } satisfies UpgradeFailedData,
@@ -1142,7 +1139,6 @@ export class IoSocketController {
                             }
                             case "itemEventMessage":
                             case "variableMessage":
-                            case "setAreaPropertyVariableMessage":
                             case "emotePromptMessage":
                             case "followRequestMessage":
                             case "followConfirmationMessage":

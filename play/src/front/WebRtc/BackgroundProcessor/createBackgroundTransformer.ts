@@ -1,4 +1,6 @@
 import { BACKGROUND_TRANSFORMER_ENGINE } from "../../Enum/EnvironmentVariable";
+import { MediaPipeTasksVisionTransformer } from "./MediaPipeTasksVisionTransformer";
+import { MediaPipeBackgroundTransformer } from "./MediaPipeBackgroundTransformer";
 import { FallbackBackgroundTransformer } from "./FallbackBackgroundTransformer";
 
 export type BackgroundMode = "none" | "blur" | "image" | "video";
@@ -24,18 +26,10 @@ export interface BackgroundTransformer {
  * Supports both the new Tasks Vision API (GPU-accelerated) and legacy Selfie Segmentation (CPU)
  * Selected via BACKGROUND_TRANSFORMER_ENGINE environment variable
  *
- * When __ENABLE_BACKGROUND_BLUR__ is false (build-time), MediaPipe deps are not bundled
- * and the fallback transformer is returned immediately.
- *
  * @param config Background configuration
  * @returns A MediaPipe transformer instance or fallback
  */
 export function createBackgroundTransformer(config: BackgroundConfig): BackgroundTransformer {
-    if (!__ENABLE_BACKGROUND_BLUR__) {
-        console.info("[BackgroundProcessor] Background blur disabled at build time");
-        return new FallbackBackgroundTransformer();
-    }
-
     // Check browser support for MediaStream APIs
     if (typeof MediaStreamTrackProcessor === "undefined" || typeof MediaStreamTrackGenerator === "undefined") {
         return new FallbackBackgroundTransformer();
@@ -46,9 +40,6 @@ export function createBackgroundTransformer(config: BackgroundConfig): Backgroun
 
     if (engine === "tasks-vision") {
         try {
-            // Dynamic require so Vite can tree-shake when __ENABLE_BACKGROUND_BLUR__ is false
-            // eslint-disable-next-line @typescript-eslint/no-require-imports
-            const { MediaPipeTasksVisionTransformer } = require("./MediaPipeTasksVisionTransformer");
             const transformer = new MediaPipeTasksVisionTransformer(config);
             return transformer;
         } catch (error) {
@@ -58,9 +49,8 @@ export function createBackgroundTransformer(config: BackgroundConfig): Backgroun
     }
 
     // Use selfie-segmentation API (legacy) when engine is not "tasks-vision"
+    // TODO: remove this selfie-segmentation path when tasks-vision is stable enough and universally supported
     try {
-        // eslint-disable-next-line @typescript-eslint/no-require-imports
-        const { MediaPipeBackgroundTransformer } = require("./MediaPipeBackgroundTransformer");
         const transformer = new MediaPipeBackgroundTransformer(config);
         return transformer;
     } catch (error) {

@@ -1,7 +1,7 @@
 import axios, { isAxiosError } from "axios";
 import type { AxiosResponse } from "axios";
 import { CompanionTextureCollection } from "@workadventure/messages";
-import Sentry from "../utils/sentry";
+import * as Sentry from "@sentry/node";
 import { ADMIN_API_TOKEN, ADMIN_API_URL } from "../enums/EnvironmentVariable";
 import type { CompanionServiceInterface } from "./CompanionServiceInterface";
 

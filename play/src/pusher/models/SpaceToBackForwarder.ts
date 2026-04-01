@@ -5,7 +5,7 @@ import type {
     PrivateEventFrontToPusher,
 } from "@workadventure/messages";
 import { SpaceUser } from "@workadventure/messages";
-import Sentry from "../utils/sentry";
+import * as Sentry from "@sentry/node";
 import Debug from "debug";
 import { Color } from "@workadventure/shared-utils";
 

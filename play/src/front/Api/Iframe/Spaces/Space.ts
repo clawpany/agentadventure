@@ -1,6 +1,6 @@
 import type { Subscriber, Subscription } from "rxjs";
 import { BehaviorSubject, Observable, Subject } from "rxjs";
-import { deepmergeInto } from "deepmerge-ts";
+import { merge } from "lodash";
 import type { CheckedIframeMessagePort } from "../CheckedIframeMessagePort";
 import type { NewSpaceUserEvent } from "../../Events/NewSpaceUserEvent";
 import type { SpaceUser, ReactiveSpaceUser } from "./SpaceUser";
@@ -47,7 +47,7 @@ export class Space {
                     }
 
                     // Update the user with the changes
-                    deepmergeInto(user, event.data.data.changes);
+                    merge(user, event.data.data.changes);
 
                     for (const key in event.data.data.changes) {
                         // We allow ourselves a not 100% exact type cast here.

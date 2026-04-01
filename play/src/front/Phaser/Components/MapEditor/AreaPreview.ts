@@ -1,4 +1,3 @@
-import { deepmergeIntoCustom, type DeepMergeLeafURI } from "deepmerge-ts";
 import type {
     AreaData,
     AreaDataProperties,
@@ -6,6 +5,7 @@ import type {
     AreaDescriptionPropertyData,
     AtLeast,
 } from "@workadventure/map-editor";
+import _ from "lodash";
 import { GameObjects } from "phaser";
 import { get } from "svelte/store";
 import { DEPTH_MAP_EDITOR_AREAS_INDEX } from "../../Game/DepthIndexes";
@@ -28,10 +28,6 @@ export enum AreaPreviewEvent {
 
 const DEFAULT_COLOR = 0x0000ff;
 const DEFAULT_AREA_PREVIEW_ALPHA = 0.5;
-
-const mergeInto = deepmergeIntoCustom<unknown, { DeepMergeArraysURI: DeepMergeLeafURI }>({
-    mergeArrays: false,
-});
 
 export class AreaPreview extends Phaser.GameObjects.Rectangle {
     private squares: SizeAlteringSquare[];
@@ -157,7 +153,7 @@ export class AreaPreview extends Phaser.GameObjects.Rectangle {
     }
 
     public updatePreview(dataToModify: AtLeast<AreaData, "id">): void {
-        mergeInto(this.areaData, dataToModify);
+        _.merge(this.areaData, dataToModify);
         this.drawAreaPreviewFromAreaData(dataToModify);
     }
 
@@ -171,11 +167,17 @@ export class AreaPreview extends Phaser.GameObjects.Rectangle {
         this.emit(AreaPreviewEvent.Updated, this.areaData, oldAreaData);
     }
 
-    public updateProperty(changes: AreaDataProperty, removeAreaEntities?: boolean): void {
+    public updateProperty(changes: AtLeast<AreaDataProperty, "id">, removeAreaEntities?: boolean): void {
         const oldAreaData = structuredClone(this.areaData);
-        this.areaData.properties = this.areaData.properties.map((property) =>
-            property.id === changes.id ? changes : property
-        );
+        const property = this.areaData.properties.find((property) => property.id === changes.id);
+        if (property) {
+            _.mergeWith(property, changes, (_, targetProperty) => {
+                if (targetProperty instanceof Array) {
+                    return targetProperty;
+                }
+                return;
+            });
+        }
         this.emit(AreaPreviewEvent.Updated, this.areaData, oldAreaData, removeAreaEntities);
     }
 

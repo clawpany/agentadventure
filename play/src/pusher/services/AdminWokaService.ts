@@ -2,7 +2,7 @@ import type { AxiosResponse } from "axios";
 import axios from "axios";
 import type { WokaList } from "@workadventure/messages";
 import { wokaList } from "@workadventure/messages";
-import Sentry from "../utils/sentry";
+import * as Sentry from "@sentry/node";
 import { ADMIN_API_TOKEN, ADMIN_API_URL } from "../enums/EnvironmentVariable";
 import type { WokaServiceInterface } from "./WokaServiceInterface";
 

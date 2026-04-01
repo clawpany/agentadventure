@@ -1,5 +1,5 @@
 import type { Subscription } from "rxjs";
-import { Deferred } from "@workadventure/shared-utils";
+import { Deferred } from "ts-deferred";
 import type { Readable, Unsubscriber } from "svelte/store";
 import { get } from "svelte/store";
 import { iframeListener } from "../../Api/IframeListener";

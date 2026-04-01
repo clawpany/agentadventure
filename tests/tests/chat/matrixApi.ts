@@ -1,55 +1,41 @@
 import fs from "fs";
 import { asError } from "catch-unknown";
-import axios from "axios";
+import type { MatrixClient } from "matrix-js-sdk";
+import { createClient, Method } from "matrix-js-sdk";
 import { matrix_domain, matrix_server_url } from "../utils/urls";
-
-const LOGIN_ENDPOINT = `${matrix_server_url}/_matrix/client/v3/login`;
-
-const USERS_ENDPOINT = `${matrix_server_url}/_synapse/admin/v2/users`;
-
-const DEACTIVATE_USER_ENDPOINT = `${matrix_server_url}/_synapse/admin/v1/deactivate`;
 
 const MATRIX_ADMIN_USER = `@admin:${matrix_domain}`;
 
-interface MatrixLoginBody {
-    type: "m.login.password" | string;
-    identifier: {
-        type: "m.id.user";
-        user: string;
-    };
-    password: string;
-}
-
-interface MatrixLoginResponse {
-    user_id: string;
-    access_token: string;
-}
-
-interface MatrixUsersResponse {
-    users: { name: string }[];
-    name: string;
-}
-
-const matrixLogin: MatrixLoginBody = {
-    type: "m.login.password",
-    identifier: {
-        type: "m.id.user",
-        user: "admin",
-    },
+const matrixLogin = {
+    user: "admin",
     password: "MySecretPassword",
 };
 
+interface SynapseUser {
+    name: string;
+}
+
+interface SynapseUsersResponse {
+    users: SynapseUser[];
+}
+
 class MatrixApi {
-    private adminLoginToken: string;
+    private client: MatrixClient | undefined;
+
+    private async getClient() {
+        if (!this.client) {
+            this.client = createClient({
+                baseUrl: matrix_server_url,
+                userId: MATRIX_ADMIN_USER,
+            });
+            await this.client.login("m.login.password", matrixLogin);
+        }
+        return this.client;
+    }
 
     public async resetMatrixUsers() {
         try {
-            if (!this.adminLoginToken) {
-                const adminLoginResponse = await axios.post<MatrixLoginResponse>(LOGIN_ENDPOINT, matrixLogin);
-                const { access_token } = adminLoginResponse.data;
-                this.adminLoginToken = access_token;
-            }
-
+            await this.getClient();
             const users = await this.getUsers();
             await this.deactivateAndActivateUsers(users);
         } catch (error) {
@@ -76,10 +62,14 @@ class MatrixApi {
         }
     }
 
-    private async getUsers() {
+    private async getUsers(): Promise<SynapseUser[]> {
         try {
-            const usersResponse = await axios.get<MatrixUsersResponse>(USERS_ENDPOINT, this.getAuthenticatedHeader());
-            return usersResponse.data.users.filter((user) => user.name !== MATRIX_ADMIN_USER);
+            const client = await this.getClient();
+            const response = await client.http.authedRequest<SynapseUsersResponse>(
+                Method.Get,
+                "/_synapse/admin/v2/users",
+            );
+            return response.users.filter((user) => user.name !== MATRIX_ADMIN_USER);
         } catch (error) {
             throw asError(error);
         }
@@ -93,38 +83,24 @@ class MatrixApi {
      * @private
      */
     private async deactivateAndActivateUsers(users: { name: string }[]) {
+        const client = await this.getClient();
         for (const user of users) {
-            await axios.post(`${DEACTIVATE_USER_ENDPOINT}/${user.name}`, null, this.getAuthenticatedHeader());
+            await client.http.authedRequest(Method.Post, `/_synapse/admin/v1/deactivate/${user.name}`);
 
-            await axios.put(
-                `${USERS_ENDPOINT}/${user.name}`,
-                {
-                    deactivated: false,
-                },
-                this.getAuthenticatedHeader(),
-            );
+            await client.http.authedRequest(Method.Put, `/_synapse/admin/v2/users/${user.name}`, undefined, {
+                deactivated: false,
+            });
         }
-    }
-
-    private getAuthenticatedHeader() {
-        return { headers: { Authorization: `Bearer ${this.adminLoginToken}` } };
     }
 
     public async acceptAllInvitations(alias: string) {
         try {
-            const publicRoomsResponse = await axios.get(
-                `${matrix_server_url}/_matrix/client/r0/publicRooms`,
-                this.getAuthenticatedHeader(),
-            );
-
-            const room = publicRoomsResponse.data.chunk.find((room) => room.name === alias);
+            const client = await this.getClient();
+            const publicRoomsResponse = await client.publicRooms({});
+            const room = publicRoomsResponse.chunk.find((room) => room.name === alias);
 
             if (room) {
-                await axios.post(
-                    `${matrix_server_url}/_matrix/client/r0/join/${room.room_id}`,
-                    {},
-                    this.getAuthenticatedHeader(),
-                );
+                await client.joinRoom(room.room_id);
             }
         } catch (error) {
             throw asError(error);
@@ -134,11 +110,8 @@ class MatrixApi {
     public async acceptRoomInvitations(roomId: string) {
         if (roomId) {
             try {
-                await axios.post(
-                    `${matrix_server_url}/_matrix/client/r0/join/${roomId}`,
-                    {},
-                    this.getAuthenticatedHeader(),
-                );
+                const client = await this.getClient();
+                await client.joinRoom(roomId);
             } catch (error) {
                 throw asError(error);
             }
@@ -147,12 +120,10 @@ class MatrixApi {
 
     public async getMemberPowerLevel(roomId: string): Promise<number> {
         try {
-            const powerLevelsResponse = await axios.get(
-                `${matrix_server_url}/_matrix/client/r0/rooms/${roomId}/state/m.room.power_levels/`,
-                this.getAuthenticatedHeader(),
-            );
+            const client = await this.getClient();
+            const powerLevels = await client.getStateEvent(roomId, "m.room.power_levels", "");
 
-            return powerLevelsResponse.data.users[MATRIX_ADMIN_USER] || 0;
+            return powerLevels.users[MATRIX_ADMIN_USER] || 0;
         } catch (error) {
             throw asError(error);
         }
@@ -160,23 +131,16 @@ class MatrixApi {
 
     public async overrideRateLimitForUser(userId: string) {
         try {
-            const response = await axios.post(
-                `${matrix_server_url}/_synapse/admin/v1/users/${userId}/override_ratelimit`,
+            const client = await this.getClient();
+            await client.http.authedRequest(
+                Method.Post,
+                `/_synapse/admin/v1/users/${userId}/override_ratelimit`,
+                undefined,
                 {
                     message_per_second: 0,
                     burst_count: 0,
                 },
-                {
-                    headers: {
-                        Authorization: `Bearer ${this.adminLoginToken}`,
-                    },
-                },
             );
-            if (response.status === 200) {
-                return;
-            } else {
-                throw new Error("Failed with status " + response.status);
-            }
         } catch (error) {
             throw asError(error);
         }

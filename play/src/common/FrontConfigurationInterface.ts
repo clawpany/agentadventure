@@ -70,4 +70,5 @@ export interface FrontConfigurationInterface {
     PROVIDE_DEFAULT_WOKA_TEXTURE: "no" | "random" | "fix" | undefined;
     // Tutorial settings
     ENABLE_TUTORIAL: boolean | undefined;
+    NO_SYNAPSE: boolean | undefined;
 }

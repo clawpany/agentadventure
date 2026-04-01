@@ -1,5 +1,5 @@
 import type { NextFunction, Request, Response } from "express";
-import Sentry from "../utils/sentry";
+import * as Sentry from "@sentry/node";
 import { ADMIN_API_TOKEN } from "../enums/EnvironmentVariable";
 
 export function adminToken(req: Request, res: Response, next: NextFunction): void {

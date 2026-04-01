@@ -1,7 +1,7 @@
 import { isMapDetailsData } from "@workadventure/messages";
 import { z } from "zod";
 import type { Request, Response } from "express";
-import { errors } from "jose";
+import { JsonWebTokenError } from "jsonwebtoken";
 import Debug from "debug";
 import { DISABLE_ANONYMOUS } from "../enums/EnvironmentVariable";
 import { adminService } from "../services/AdminService";
@@ -82,7 +82,7 @@ export class MapController extends BaseHttpController {
                 res.json(mapDetails);
                 return;
             } catch (error) {
-                if (error instanceof errors.JWTInvalid || error instanceof errors.JWTExpired) {
+                if (error instanceof JsonWebTokenError) {
                     console.warn("Invalid token received", error);
                     res.status(401);
                     res.send("The Token is invalid");

@@ -42,8 +42,6 @@
     import { ON_ACTION_TRIGGER_ENTER } from "../../../WebRtc/LayoutManager";
     import HighlightPropertyEditor from "../PropertyEditor/HighlightPropertyEditor.svelte";
     import { gameManager } from "../../../Phaser/Game/GameManager";
-    import MaxUsersInAreaPropertyEditor from "../PropertyEditor/MaxUsersInAreaPropertyEditor.svelte";
-    import LockableAreaPropertyEditor from "../PropertyEditor/LockableAreaPropertyEditor.svelte";
 
     let properties: AreaDataProperties = [];
     let areaName = "";
@@ -64,8 +62,6 @@
     let hasMatrixRoom: boolean;
     let hasTooltipPropertyData: boolean;
     let hasLivekitRoomProperty: boolean;
-    let hasMaxUsersInAreaProperty: boolean;
-    let hasLockableAreaProperty: boolean;
 
     const ROOM_AREA_PUSHER_URL = new URL("roomArea", PUSHER_URL).toString();
 
@@ -160,15 +156,6 @@
             case "jitsiRoomProperty": {
                 // Add highlight property if not present. Use time out to improve UX and add after the listener megaphone property
                 setTimeout(() => {
-                    if (
-                        !$mapEditorSelectedAreaPreviewStore
-                            ?.getProperties()
-                            .find((p) => p.type === "lockableAreaPropertyData")
-                    ) {
-                        $mapEditorSelectedAreaPreviewStore?.addProperty(
-                            getPropertyFromType("lockableAreaPropertyData")
-                        );
-                    }
                     if (!$mapEditorSelectedAreaPreviewStore?.getProperties().find((p) => p.type === "highlight")) {
                         $mapEditorSelectedAreaPreviewStore?.addProperty(getPropertyFromType("highlight"));
                     }
@@ -184,17 +171,8 @@
                 };
             }
             case "livekitRoomProperty": {
-                // Add lockableProperty, then highlight property if not present. Use time out to improve UX and add after the listener megaphone property
+                // Add highlight property if not present. Use time out to improve UX and add after the listener megaphone property
                 setTimeout(() => {
-                    if (
-                        !$mapEditorSelectedAreaPreviewStore
-                            ?.getProperties()
-                            .find((p) => p.type === "lockableAreaPropertyData")
-                    ) {
-                        $mapEditorSelectedAreaPreviewStore?.addProperty(
-                            getPropertyFromType("lockableAreaPropertyData")
-                        );
-                    }
                     if (!$mapEditorSelectedAreaPreviewStore?.getProperties().find((p) => p.type === "highlight")) {
                         $mapEditorSelectedAreaPreviewStore?.addProperty(getPropertyFromType("highlight"));
                     }
@@ -283,15 +261,6 @@
                 const areasName = getSpeakerMegaphoneAreasName();
                 // Add highlight property if not present. Use time out to improve UX and add after the listener megaphone property
                 setTimeout(() => {
-                    if (
-                        !$mapEditorSelectedAreaPreviewStore
-                            ?.getProperties()
-                            .find((p) => p.type === "lockableAreaPropertyData")
-                    ) {
-                        $mapEditorSelectedAreaPreviewStore?.addProperty(
-                            getPropertyFromType("lockableAreaPropertyData")
-                        );
-                    }
                     if (!$mapEditorSelectedAreaPreviewStore?.getProperties().find((p) => p.type === "highlight")) {
                         $mapEditorSelectedAreaPreviewStore?.addProperty(getPropertyFromType("highlight"));
                     }
@@ -382,19 +351,6 @@
                     width: 50,
                     trigger: ON_ACTION_TRIGGER_ENTER,
                     hideUrl: false,
-                };
-            case "maxUsersInAreaPropertyData":
-                return {
-                    id,
-                    type,
-                    maxUsers: 15,
-                };
-            case "lockableAreaPropertyData":
-                return {
-                    id,
-                    type,
-                    // Note: lock state is stored in area property variables, not in the WAM
-                    allowedTags: [],
                 };
             default:
                 throw new Error(`Unknown property type ${type}`);
@@ -520,8 +476,6 @@
         hasMatrixRoom = hasProperty("matrixRoomPropertyData");
         hasTooltipPropertyData = hasProperty("tooltipPropertyData");
         hasLivekitRoomProperty = hasProperty("livekitRoomProperty");
-        hasMaxUsersInAreaProperty = hasProperty("maxUsersInAreaPropertyData");
-        hasLockableAreaProperty = hasProperty("lockableAreaPropertyData");
     }
 
     function openKlaxoonActivityPicker(app: AreaDataProperty) {
@@ -685,22 +639,6 @@
                     property="tooltipPropertyData"
                     on:click={() => {
                         onAddProperty("tooltipPropertyData");
-                    }}
-                />
-            {/if}
-            {#if !hasLockableAreaProperty}
-                <AddPropertyButtonWrapper
-                    property="lockableAreaPropertyData"
-                    on:click={() => {
-                        onAddProperty("lockableAreaPropertyData");
-                    }}
-                />
-            {/if}
-            {#if !hasMaxUsersInAreaProperty}
-                <AddPropertyButtonWrapper
-                    property="maxUsersInAreaPropertyData"
-                    on:click={() => {
-                        onAddProperty("maxUsersInAreaPropertyData");
                     }}
                 />
             {/if}
@@ -1030,22 +968,6 @@
                                 }}
                                 on:change={() => onUpdateProperty(property)}
                                 on:highlightAreaOnEnter={() => onAddProperty("highlight")}
-                            />
-                        {:else if property.type === "lockableAreaPropertyData"}
-                            <LockableAreaPropertyEditor
-                                {property}
-                                on:close={() => {
-                                    onDeleteProperty(property.id);
-                                }}
-                                on:change={() => onUpdateProperty(property)}
-                            />
-                        {:else if property.type === "maxUsersInAreaPropertyData"}
-                            <MaxUsersInAreaPropertyEditor
-                                {property}
-                                on:close={() => {
-                                    onDeleteProperty(property.id);
-                                }}
-                                on:change={() => onUpdateProperty(property)}
                             />
                         {/if}
                     </div>

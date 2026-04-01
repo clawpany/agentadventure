@@ -1,5 +1,5 @@
 import type { NextFunction, Request, Response } from "express";
-import Sentry from "../utils/sentry";
+import * as Sentry from "@sentry/node";
 import { MAP_STORAGE_API_TOKEN } from "../enums/EnvironmentVariable";
 
 export function mapStorageToken(req: Request, res: Response, next: NextFunction): void {

@@ -1,26 +1,23 @@
 
-# typescript build (includes protobuf generation)
-FROM --platform=$BUILDPLATFORM node:20.18-bullseye-slim AS builder
-ARG NODE_OPTIONS="--max-old-space-size=12288"
-ARG FAST_BUILD=true
-ARG ENABLE_BACKGROUND_BLUR=false
-ARG ENABLE_SENTRY=false
-ARG ENABLE_POSTHOG=false
+# protobuf build
+FROM --platform=$BUILDPLATFORM node:20.18-bullseye-slim AS proto-builder
 WORKDIR /usr/src
-RUN sed -i 's|deb.debian.org|mirrors.aliyun.com|g' /etc/apt/sources.list && \
-    sed -i 's|security.debian.org|mirrors.aliyun.com|g' /etc/apt/sources.list && \
-    apt-get update && apt-get install -y --no-install-recommends git && \
-    rm -rf /var/lib/apt/lists/*
-RUN npm config set registry https://registry.npmmirror.com
+COPY messages/package-lock.json messages/package.json ./
+RUN --mount=type=cache,target=/root/.npm npm ci
+COPY messages .
+COPY libs ./../libs
+RUN npm run tag-version && npm run ts-proto
 
-# 1) Install & run protobuf generation
-COPY messages/package-lock.json messages/package.json messages/
-RUN cd messages && npm ci
-COPY messages messages
-COPY libs ./libs
-RUN cd messages && npm run tag-version && npm run ts-proto
-
-# 2) Install workspace deps (cached until package.json/lock changes)
+# typescript build
+FROM --platform=$BUILDPLATFORM node:20.18-bullseye-slim AS builder
+# Default to 6GB which is safer for 8GB Docker Desktop environments. 
+# If your machine allows, override this with 16384 during build.
+ARG NODE_OPTIONS="--max-old-space-size=6144"
+ARG FAST_BUILD=""
+WORKDIR /usr/src
+RUN sed -i 's/deb.debian.org/mirrors.aliyun.com/g' /etc/apt/sources.list && \
+    sed -i 's/security.debian.org/mirrors.aliyun.com/g' /etc/apt/sources.list && \
+    apt-get update && apt-get install -y git build-essential python3
 COPY package.json package-lock.json ./
 COPY play/package.json play/package.json
 COPY play/packages/iframe-api-typings/package.json play/packages/iframe-api-typings/package.json
@@ -30,10 +27,18 @@ COPY libs/math-utils/package.json libs/math-utils/package.json
 COPY libs/tailwind/package.json libs/tailwind/package.json
 COPY libs/store-utils/package.json libs/store-utils/package.json
 COPY libs/shared-utils/package.json libs/shared-utils/package.json
-RUN npm ci --workspace=workadventure-play --workspace=@workadventure/iframe-api-typings...
 
-# 3) Copy source and build
+# Cache npm dependencies
+RUN --mount=type=cache,target=/root/.npm \
+    npm ci --workspace=workadventure-play --workspace=@workadventure/iframe-api-typings \
+    --workspace=@workadventure/messages --workspace=@workadventure/map-editor \
+    --workspace=@workadventure/math-utils --workspace=@workadventure/tailwind \
+    --workspace=@workadventure/store-utils --workspace=@workadventure/shared-utils
+
+COPY libs ./libs
+COPY --from=proto-builder /usr/libs/messages/src ./libs/messages/src
 COPY play ./play
+COPY --from=proto-builder /usr/src/generated play/src/messages/generated
 ENV NODE_ENV=production
 RUN --mount=type=secret,id=SENTRY_RELEASE \
     --mount=type=secret,id=SENTRY_URL \
@@ -41,6 +46,8 @@ RUN --mount=type=secret,id=SENTRY_RELEASE \
     --mount=type=secret,id=SENTRY_ORG \
     --mount=type=secret,id=SENTRY_PROJECT \
     --mount=type=secret,id=SENTRY_ENVIRONMENT \
+    --mount=type=cache,target=/root/.npm \
+    --mount=type=cache,target=/usr/src/play/node_modules/.vite \
     export SENTRY_RELEASE=$(cat /run/secrets/SENTRY_RELEASE) && \
     export SENTRY_URL=$(cat /run/secrets/SENTRY_URL) && \
     export SENTRY_AUTH_TOKEN=$(cat /run/secrets/SENTRY_AUTH_TOKEN) && \
@@ -49,23 +56,19 @@ RUN --mount=type=secret,id=SENTRY_RELEASE \
     export SENTRY_ENVIRONMENT=$(cat /run/secrets/SENTRY_ENVIRONMENT) && \
     export NODE_OPTIONS="$NODE_OPTIONS" && \
     export DISABLE_LEGACY_BROWSERS="$FAST_BUILD" && \
-    export ENABLE_BACKGROUND_BLUR="$ENABLE_BACKGROUND_BLUR" && \
-    export ENABLE_SENTRY="$ENABLE_SENTRY" && \
-    export ENABLE_POSTHOG="$ENABLE_POSTHOG" && \
+    export GENERATE_SOURCEMAP=false && \
     cd play && \
     npm run typesafe-i18n && \
     npm run build-iframe-api && \
-    npm run build
+    SENTRY_RELEASE=$SENTRY_RELEASE SENTRY_URL=$SENTRY_URL SENTRY_AUTH_TOKEN=$SENTRY_AUTH_TOKEN SENTRY_ORG=$SENTRY_ORG SENTRY_PROJECT=$SENTRY_PROJECT SENTRY_ENVIRONMENT=$SENTRY_ENVIRONMENT npm run build
 
 # final production image
 FROM node:20.18-bullseye-slim
 EXPOSE 3000
 WORKDIR /usr/src
-RUN sed -i 's|deb.debian.org|mirrors.aliyun.com|g' /etc/apt/sources.list && \
-    sed -i 's|security.debian.org|mirrors.aliyun.com|g' /etc/apt/sources.list && \
-    apt-get update && apt-get install -y --no-install-recommends git python3 make g++ cmake && \
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends git curl && \
     rm -rf /var/lib/apt/lists/*
-RUN npm config set registry https://registry.npmmirror.com
 COPY package.json package-lock.json ./
 COPY play/package.json play/package.json
 COPY play/packages/iframe-api-typings/package.json play/packages/iframe-api-typings/package.json
@@ -75,28 +78,14 @@ COPY libs/math-utils/package.json libs/math-utils/package.json
 COPY libs/tailwind/package.json libs/tailwind/package.json
 COPY libs/store-utils/package.json libs/store-utils/package.json
 COPY libs/shared-utils/package.json libs/shared-utils/package.json
-COPY play/scripts/conditional-install.sh play/scripts/conditional-install.sh
-ARG ENABLE_BACKGROUND_BLUR=false
-ARG ENABLE_S3_RECORDING=false
-ARG ENABLE_SWAGGER=false
-ARG ENABLE_SENTRY=false
-ARG ENABLE_POSTHOG=false
 ENV NODE_ENV=production
 ENV UWS_HTTP_MAX_HEADERS_SIZE=16384
-ENV ENABLE_SENTRY=${ENABLE_SENTRY}
-ENV ENABLE_S3_RECORDING=${ENABLE_S3_RECORDING}
-RUN ENABLE_BACKGROUND_BLUR=$ENABLE_BACKGROUND_BLUR \
-    ENABLE_S3_RECORDING=$ENABLE_S3_RECORDING \
-    ENABLE_SWAGGER=$ENABLE_SWAGGER \
-    ENABLE_SENTRY=$ENABLE_SENTRY \
-    ENABLE_POSTHOG=$ENABLE_POSTHOG \
-    sh play/scripts/conditional-install.sh && \
-    npm ci --omit=dev --workspace workadventure-play
+RUN npm ci --omit=dev --workspace workadventure-play
 COPY --from=builder /usr/src/libs /usr/src/libs
 COPY --from=builder --chown=node:node /usr/src/play /usr/src/play
 WORKDIR /usr/src/play
 
-HEALTHCHECK --interval=10s --timeout=7s --start-period=10s --retries=15 CMD node -e "fetch('http://localhost:3000/ping').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"
+HEALTHCHECK --interval=10s --timeout=7s --start-period=10s --retries=15 CMD curl -f http://localhost:3000/ping || exit 1
 
 USER node
 CMD ["npm", "run", "start"]

@@ -46,7 +46,6 @@ import type {
     AddSpaceUserToNotifyMessage,
     DeleteSpaceUserToNotifyMessage,
     AbortQueryMessage,
-    SetAreaPropertyVariableMessage,
     BackEventMessage,
 } from "@workadventure/messages";
 import {
@@ -56,7 +55,7 @@ import {
     FilterType,
     AskPositionMessage_AskType,
 } from "@workadventure/messages";
-import { SignJWT } from "jose";
+import Jwt from "jsonwebtoken";
 import BigbluebuttonJs from "bigbluebutton-js";
 import Debug from "debug";
 import * as Sentry from "@sentry/node";
@@ -198,9 +197,6 @@ export class SocketManager {
             });
         }
 
-        // Get area property variables for initial state
-        const areaPropertyVariables = room.getAreaPropertyVariables();
-
         const roomJoinedMessage: Partial<RoomJoinedMessage> = {
             tag: joinRoomMessage.tag,
             userRoomToken: joinRoomMessage.userRoomToken,
@@ -214,7 +210,6 @@ export class SocketManager {
             activatedInviteUser: user.activatedInviteUser != undefined ? user.activatedInviteUser : true,
             applications: user.applications ?? [],
             playerVariable: playerVariablesMessage,
-            areaPropertyVariable: areaPropertyVariables,
         };
 
         user.write({
@@ -272,31 +267,6 @@ export class SocketManager {
 
     handleVariableEvent(room: GameRoom, user: User, variableMessage: VariableMessage): Promise<void> {
         return room.setVariable(variableMessage.name, variableMessage.value, user);
-    }
-
-    async handleSetAreaPropertyVariableEvent(
-        room: GameRoom,
-        user: User,
-        message: SetAreaPropertyVariableMessage
-    ): Promise<void> {
-        const result = await room.setAreaPropertyVariableWithPermissionCheck(
-            user.tags,
-            message.areaId,
-            message.propertyId,
-            message.key,
-            message.value
-        );
-
-        if (!result.success) {
-            // Log the permission denial for monitoring
-            console.warn(
-                `User ${user.uuid} denied permission to set area property variable: ` +
-                    `areaId=${message.areaId}, propertyId=${message.propertyId}, key=${message.key}. ` +
-                    `User tags: [${user.tags.join(", ")}]. Error: ${result.error}`
-            );
-            // Note: We don't send an error back to the client as this is a security check
-            // The client should have already verified permissions before allowing the action
-        }
     }
 
     async readVariable(roomUrl: string, variable: string): Promise<string | undefined> {
@@ -769,34 +739,37 @@ export class SocketManager {
             }
         }
 
-        const jwt = new SignJWT({
-            context: {
-                user: {
-                    id: user.id,
-                    name: user.name,
+        const jwt = Jwt.sign(
+            {
+                aud: "jitsi",
+                context: {
+                    user: {
+                        id: user.id,
+                        name: user.name,
+                    },
+                    features: {
+                        livestreaming: isAdmin,
+                        recording: isAdmin,
+                    },
                 },
-                features: {
-                    livestreaming: isAdmin,
-                    recording: isAdmin,
-                },
+                iss: jitsiSettings.iss,
+                sub: jitsiSettings.url,
+                room: jitsiRoom,
+                moderator: isAdmin,
             },
-            sub: jitsiSettings.url,
-            room: jitsiRoom,
-            moderator: isAdmin,
-        })
-            .setProtectedHeader({
-                alg: "HS256",
-                typ: "JWT",
-            })
-            .setAudience("jitsi")
-            .setExpirationTime("1d");
-
-        if (jitsiSettings.iss) {
-            jwt.setIssuer(jitsiSettings.iss);
-        }
+            jitsiSettings.secret,
+            {
+                expiresIn: "1d",
+                algorithm: "HS256",
+                header: {
+                    alg: "HS256",
+                    typ: "JWT",
+                },
+            }
+        );
 
         return {
-            jwt: await jwt.sign(new TextEncoder().encode(jitsiSettings.secret)),
+            jwt,
             url: jitsiSettings.url,
         };
     }
@@ -1009,7 +982,6 @@ export class SocketManager {
     private cleanupRoomIfEmpty(room: GameRoom): void {
         if (room.isEmpty()) {
             this.roomsPromises.delete(room.roomUrl);
-            this.resolvedRooms.get(room.roomUrl)?.destroy();
             const deleted = this.resolvedRooms.delete(room.roomUrl);
             if (deleted) {
                 gaugeManager.decNbRoomGauge();
@@ -1671,7 +1643,7 @@ export class SocketManager {
         clientEventsEmitter.deleteSpaceSubject.next(space);
     }
 
-    handleSpaceQueryMessage(pusher: SpacesWatcher, spaceQueryMessage: SpaceQueryMessage) {
+    async handleSpaceQueryMessage(pusher: SpacesWatcher, spaceQueryMessage: SpaceQueryMessage) {
         const space = this.spaces.get(spaceQueryMessage.spaceName);
 
         if (!space) {
@@ -1685,7 +1657,7 @@ export class SocketManager {
         }
 
         try {
-            const answer = space.handleQuery(pusher, spaceQueryMessage);
+            const answer = await space.handleQuery(pusher, spaceQueryMessage);
             pusher.write({
                 message: {
                     $case: "spaceAnswerMessage",

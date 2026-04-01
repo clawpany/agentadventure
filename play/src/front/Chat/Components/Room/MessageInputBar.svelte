@@ -178,11 +178,6 @@
             replyingToMessageId: replyMessageId ?? null,
         });
         if (setTimeOutProperty) clearTimeout(setTimeOutProperty);
-        if (stopTypingTimeOutID) {
-            clearTimeout(stopTypingTimeOutID);
-            stopTypingTimeOutID = undefined;
-        }
-        room.stopTyping().catch((error) => console.error(error));
         closeEmojiPicker?.();
         closeEmojiPicker = undefined;
         selectedChatChatMessageToReplyUnsubscriber();
@@ -425,13 +420,11 @@
 </script>
 
 {#if files.length > 0 && !(room instanceof ProximityChatRoom)}
-    <div class="w-full min-w-0 p-1">
-        <div
-            class="flex flex-row flex-nowrap gap-2 w-full min-w-[200px] overflow-x-auto no-scroll-bar rounded-lg p-2 bg-contrast/80"
-        >
+    <div class="w-full p-1">
+        <div class="flex flex-row gap-2 w-full overflow-visible no-scroll-bar rounded-lg p-2 bg-contrast/80">
             {#each filesPreview as preview (preview.id)}
                 <div
-                    class="relative shrink-0 content-center {preview.type.includes('image')
+                    class="relative content-center {preview.type.includes('image')
                         ? 'w-20'
                         : 'w-28'} h-20 rounded-md backdrop-opacity-10 bg-white p-0.5"
                 >

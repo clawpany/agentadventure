@@ -1,4 +1,4 @@
-import Sentry from "../../utils/sentry";
+import * as Sentry from "@sentry/node";
 import debug from "debug";
 import type { SpaceUserExtended, PartialSpaceUser } from "../Space";
 import type { SpaceNotificationContext, SpaceNotificationStrategy } from "./SpaceNotificationStrategy";

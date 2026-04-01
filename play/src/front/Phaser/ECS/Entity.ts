@@ -8,7 +8,7 @@ import type {
     WAMEntityData,
 } from "@workadventure/map-editor";
 import { GameMapProperties } from "@workadventure/map-editor";
-import { deepmergeInto } from "deepmerge-ts";
+import merge from "lodash/merge";
 import type OutlinePipelinePlugin from "phaser3-rex-plugins/plugins/outlinepipeline-plugin.js";
 import type { Unsubscriber } from "svelte/store";
 import { get } from "svelte/store";
@@ -36,7 +36,7 @@ export enum EntityEvent {
     PropertyActivated = "EntityEvent:PropertyActivated",
 }
 
-export const DEFAULT_ACTIVABLE_RADIUS = 14;
+export const DEFAULT_ACTIVABLE_RADIUS = 38;
 
 // NOTE: Tiles-based entity for now. Individual images later on
 export class Entity extends Phaser.GameObjects.Image implements ActivatableInterface, OutlineableInterface {
@@ -124,7 +124,7 @@ export class Entity extends Phaser.GameObjects.Image implements ActivatableInter
      * This method is being used after command execution from outside and it will not trigger any emits
      */
     public updateEntity(dataToModify: Partial<WAMEntityData>): void {
-        deepmergeInto(this.entityData, dataToModify);
+        merge(this.entityData, dataToModify);
         // TODO: Find a way to update it without need of using conditions
         if (dataToModify.properties !== undefined) {
             this.entityData.properties = dataToModify.properties;
@@ -298,7 +298,7 @@ export class Entity extends Phaser.GameObjects.Image implements ActivatableInter
     public updateProperty(changes: AtLeast<EntityDataProperty, "id">): void {
         const property = this.entityData.properties.find((property) => property.id === changes.id);
         if (property) {
-            deepmergeInto(property, changes);
+            merge(property, changes);
         }
         this.emit(EntityEvent.Updated, this.appendId({ properties: this.entityData.properties }));
 

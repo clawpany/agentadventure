@@ -62,11 +62,6 @@ export const EnvironmentVariables = z.object({
     PUSHER_URL: AbsoluteOrRelativeUrl.optional().describe("Public URL of the pusher service"),
     FRONT_URL: AbsoluteOrRelativeUrl.optional().describe("Public URL of the frontend application"),
     MAP_STORAGE_API_TOKEN: z.string().describe("API token for authenticating with the map-storage service"),
-    REDIS_HOST: z.string().optional().transform(emptyStringToUndefined).describe("Redis server hostname or IP address"),
-    REDIS_PORT: PositiveIntAsString.optional()
-        .transform((val) => toNumber(val, 6379))
-        .describe("Redis server port. Defaults to 6379"),
-    REDIS_PASSWORD: z.string().optional().transform(emptyStringToUndefined).describe("Redis authentication password"),
     PUBLIC_MAP_STORAGE_URL: z
         .string()
         .url()
@@ -480,6 +475,11 @@ export const EnvironmentVariables = z.object({
         .optional()
         .describe(
             "Virtual background transformer engine: 'tasks-vision' (GPU-accelerated, experimental) or 'selfie-segmentation' (CPU-based, stable). Currently defaults to 'selfie-segmentation'; 'tasks-vision' is intended as the future default once considered stable."
+        ),
+    NO_SYNAPSE: BoolAsString.optional()
+        .transform((val) => toBool(val, false))
+        .describe(
+            "If true, the Matrix server is not a Synapse server and Synapse-specific admin API calls will be skipped."
         ),
 });
 

@@ -1,5 +1,5 @@
+import Jwt from "jsonwebtoken";
 import Debug from "debug";
-import { SignJWT } from "jose";
 import type {
     AddSpaceFilterMessage,
     AdminMessage,
@@ -45,7 +45,7 @@ import type {
     BackEventFrontToPusherMessage,
 } from "@workadventure/messages";
 import { noUndefined, ServerToClientMessage } from "@workadventure/messages";
-import Sentry from "../utils/sentry";
+import * as Sentry from "@sentry/node";
 import type { AxiosResponse } from "axios";
 import axios, { isAxiosError } from "axios";
 import type { WebSocket } from "uWebSockets.js";
@@ -1539,11 +1539,9 @@ export class SocketManager implements ZoneEventListener {
 
         const wamUrl = !("wamUrl" in mapDetails) ? "" : mapDetails.wamUrl;
 
-        const secret = new TextEncoder().encode(SECRET_KEY ?? "");
-        return new SignJWT({ wamUrl, tags: userData.tags })
-            .setExpirationTime("1h")
-            .setProtectedHeader({ alg: "HS256" })
-            .sign(secret);
+        return Jwt.sign({ wamUrl, tags: userData.tags }, SECRET_KEY, {
+            expiresIn: "1h",
+        });
     }
 
     deleteSpaceIfEmpty(spaceName: string) {

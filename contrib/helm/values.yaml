@@ -282,7 +282,6 @@ play:
 
   secretEnv:
     ROOM_API_SECRET_KEY: myRoomApiSecretKey
-    # REDIS_PASSWORD:
 
   # The name of a configMap that should be added to the service.
   externalConfigMapName: ""

@@ -8,9 +8,6 @@ class AnalyticsClient {
     private posthogPromise: Promise<PostHog> | undefined;
 
     constructor() {
-        if (!__ENABLE_POSTHOG__) {
-            return;
-        }
         const postHogApiKey = POSTHOG_API_KEY;
         if (postHogApiKey && POSTHOG_URL) {
             this.posthogPromise = import("posthog-js").then(({ default: posthog }) => {

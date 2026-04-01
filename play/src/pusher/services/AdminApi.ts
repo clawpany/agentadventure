@@ -23,9 +23,9 @@ import {
 } from "@workadventure/messages";
 import { z } from "zod";
 import { extendApi } from "@anatine/zod-openapi";
-import Sentry from "../utils/sentry";
-import { Deferred } from "@workadventure/shared-utils";
-import { errors } from "jose";
+import * as Sentry from "@sentry/node";
+import { Deferred } from "ts-deferred";
+import { JsonWebTokenError } from "jsonwebtoken";
 import {
     ADMIN_API_RETRY_DELAY,
     ADMIN_API_TOKEN,
@@ -111,6 +111,10 @@ export const isFetchMemberDataByUuidSuccessResponse = z.object({
     world: extendApi(z.string(), {
         description: "name of the world",
     }),
+    locale: extendApi(z.string().nullable().optional(), {
+        description: "The locale of the fetched user.",
+        example: "en",
+    }),
     chatID: extendApi(z.string().optional(), {
         description: "ChatId of user",
     }),
@@ -126,7 +130,50 @@ export const isFetchWorldChatMembers = z.object({
 });
 export type FetchMemberDataByUuidSuccessResponse = z.infer<typeof isFetchMemberDataByUuidSuccessResponse>;
 
-export const isFetchMemberDataByUuidResponse = z.union([isFetchMemberDataByUuidSuccessResponse, ErrorApiData]);
+const isFetchMemberDataByUuidResponseRaw = z.union([isFetchMemberDataByUuidSuccessResponse, ErrorApiData]);
+
+export const isFetchMemberDataByUuidResponse = z.any().superRefine((data, ctx) => {
+    const isObject = z.record(z.string(), z.unknown()).safeParse(data);
+    if (!isObject.success) {
+        ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: "Expected an object",
+        });
+        return;
+    }
+
+    if (data.status === "ok") {
+        const result = isFetchMemberDataByUuidSuccessResponse.safeParse(data);
+        if (!result.success) {
+            result.error.issues.forEach((issue) => {
+                ctx.addIssue({
+                    ...issue,
+                    path: [...ctx.path, ...issue.path],
+                });
+            });
+        }
+    } else if (data.status === "error") {
+        const result = ErrorApiData.safeParse(data);
+        if (!result.success) {
+            result.error.issues.forEach((issue) => {
+                ctx.addIssue({
+                    ...issue,
+                    path: [...ctx.path, ...issue.path],
+                });
+            });
+        }
+    } else {
+        const result = isFetchMemberDataByUuidResponseRaw.safeParse(data);
+        if (!result.success) {
+            result.error.issues.forEach((issue) => {
+                ctx.addIssue({
+                    ...issue,
+                    path: [...ctx.path, ...issue.path],
+                });
+            });
+        }
+    }
+}) as unknown as typeof isFetchMemberDataByUuidResponseRaw;
 
 export type FetchMemberDataByUuidResponse = z.infer<typeof isFetchMemberDataByUuidResponse>;
 
@@ -228,13 +275,13 @@ class AdminApi implements AdminInterface {
             if (authToken != undefined) {
                 let authTokenData: AuthTokenData;
                 try {
-                    authTokenData = await jwtTokenManager.verifyJWTToken(authToken);
+                    authTokenData = jwtTokenManager.verifyJWTToken(authToken);
                     userId = authTokenData.identifier;
                     accessToken = authTokenData.accessToken;
                     //eslint-disable-next-line @typescript-eslint/no-unused-vars
                 } catch (e) {
                     // Decode token, in this case we don't need to create new token.
-                    authTokenData = await jwtTokenManager.verifyJWTToken(authToken, true);
+                    authTokenData = jwtTokenManager.verifyJWTToken(authToken, true);
                     userId = authTokenData.identifier;
                     accessToken = authTokenData.accessToken;
                     console.info("JWT expire, but decoded:", userId);
@@ -332,7 +379,7 @@ class AdminApi implements AdminInterface {
                 details: "The server answered with an invalid response. The administrator has been notified.",
             };
         } catch (err) {
-            if (err instanceof errors.JWTInvalid || err instanceof errors.JWTExpired) {
+            if (err instanceof JsonWebTokenError) {
                 throw err;
             }
             let message = "Unknown error";
